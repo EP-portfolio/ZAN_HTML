@@ -538,10 +538,24 @@ async function renderTop10Map(containerId, data) {
         return;
     }
     
-    // Nettoyer la carte précédente
-    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--color-text-muted);">Chargement de la carte...</div>';
+    // Vérifier si le conteneur a déjà une carte Leaflet initialisée
+    if (container._leaflet_id) {
+        console.warn('Carte déjà initialisée dans ce conteneur, suppression...');
+        // Détruire la carte existante
+        if (window.top10Map) {
+            try {
+                window.top10Map.remove();
+            } catch (e) {
+                console.warn('Erreur lors de la suppression de la carte précédente:', e);
+            }
+        }
+        // Nettoyer le conteneur complètement
+        container.innerHTML = '';
+        container._leaflet_id = null;
+        window.top10Map = null;
+    }
     
-    // Détruire la carte Leaflet existante si elle existe
+    // Détruire la carte Leaflet existante si elle existe (double vérification)
     if (window.top10Map) {
         try {
             window.top10Map.remove();
@@ -550,6 +564,9 @@ async function renderTop10Map(containerId, data) {
         }
         window.top10Map = null;
     }
+    
+    // Nettoyer le conteneur
+    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--color-text-muted);">Chargement de la carte...</div>';
     
     // Récupérer les codes INSEE
     const codesInsee = data.filter(d => d.code_insee).map(d => d.code_insee);

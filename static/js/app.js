@@ -378,19 +378,27 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
     const optionsContainer = document.getElementById(optionsId);
     const toggle = document.getElementById(toggleId);
     
-    if (!optionsContainer || !toggle) return;
+    if (!optionsContainer || !toggle) {
+        console.warn(`Éléments non trouvés pour ${optionsId} ou ${toggleId}`);
+        return;
+    }
     
     // Filtrer les valeurs sélectionnées qui ne sont plus disponibles
     state.filters[filterKey] = state.filters[filterKey].filter(v => options.includes(v));
     
+    // Supprimer les anciens event listeners en clonant le conteneur
+    const newContainer = optionsContainer.cloneNode(false);
+    optionsContainer.parentNode.replaceChild(newContainer, optionsContainer);
+    const freshContainer = document.getElementById(optionsId);
+    
     // Créer les options avec option "Tout" en premier
     if (options.length === 0) {
-        optionsContainer.innerHTML = '<div class="dropdown-option" style="color: var(--color-text-muted); cursor: default;">Aucune option disponible</div>';
+        freshContainer.innerHTML = '<div class="dropdown-option" style="color: var(--color-text-muted); cursor: default;">Aucune option disponible</div>';
     } else {
         // Option "Tout" pour réinitialiser les filtres
         const allSelected = state.filters[filterKey].length === 0;
         const allOptions = [
-            `<div class="dropdown-option ${allSelected ? 'selected' : ''}" data-value="__ALL__" style="font-weight: bold; border-bottom: 1px solid var(--color-border); margin-bottom: 4px;">
+            `<div class="dropdown-option ${allSelected ? 'selected' : ''}" data-value="__ALL__" style="font-weight: bold; border-bottom: 1px solid var(--color-border); margin-bottom: 4px; padding-bottom: 4px;">
                 <input type="checkbox" id="check_${filterKey}_ALL" ${allSelected ? 'checked' : ''}>
                 <label for="check_${filterKey}_ALL">Tout</label>
             </div>`
@@ -408,60 +416,67 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
             `;
         }));
         
-        optionsContainer.innerHTML = allOptions.join('');
+        freshContainer.innerHTML = allOptions.join('');
     }
     
-    // Gérer les clics sur les options
-    optionsContainer.querySelectorAll('.dropdown-option[data-value]').forEach(option => {
-        option.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const checkbox = option.querySelector('input[type="checkbox"]');
-            const value = option.dataset.value;
-            
-            if (!value) return; // Ignorer les options sans valeur
-            
-            // Gérer l'option "Tout"
-            if (value === '__ALL__') {
-                if (checkbox.checked) {
-                    // Désélectionner "Tout" = sélectionner toutes les options
-                    state.filters[filterKey] = [...options];
-                    // Mettre à jour toutes les checkboxes
-                    optionsContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
-                        if (opt.dataset.value !== '__ALL__') {
-                            const optCheckbox = opt.querySelector('input[type="checkbox"]');
+    // Gérer les clics sur les options avec délégation d'événements (un seul listener)
+    freshContainer.addEventListener('click', (e) => {
+        const option = e.target.closest('.dropdown-option[data-value]');
+        if (!option) return;
+        
+        e.stopPropagation();
+        const checkbox = option.querySelector('input[type="checkbox"]');
+        const value = option.dataset.value;
+        
+        if (!value || !checkbox) return; // Ignorer les options sans valeur ou checkbox
+        
+        // Gérer l'option "Tout"
+        if (value === '__ALL__') {
+            if (checkbox.checked) {
+                // Désélectionner "Tout" = sélectionner toutes les options
+                state.filters[filterKey] = [...options];
+                // Mettre à jour toutes les checkboxes
+                freshContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
+                    if (opt.dataset.value !== '__ALL__') {
+                        const optCheckbox = opt.querySelector('input[type="checkbox"]');
+                        if (optCheckbox) {
                             optCheckbox.checked = true;
                             opt.classList.add('selected');
                         }
-                    });
-                } else {
-                    // Sélectionner "Tout" = désélectionner toutes les options
-                    state.filters[filterKey] = [];
-                    // Mettre à jour toutes les checkboxes
-                    optionsContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
-                        const optCheckbox = opt.querySelector('input[type="checkbox"]');
+                    }
+                });
+            } else {
+                // Sélectionner "Tout" = désélectionner toutes les options
+                state.filters[filterKey] = [];
+                // Mettre à jour toutes les checkboxes
+                freshContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
+                    const optCheckbox = opt.querySelector('input[type="checkbox"]');
+                    if (optCheckbox) {
                         optCheckbox.checked = false;
                         opt.classList.remove('selected');
-                    });
-                    checkbox.checked = true; // "Tout" reste coché
-                }
-            } else {
-                // Gestion normale d'une option
-                checkbox.checked = !checkbox.checked;
-                
-                if (checkbox.checked) {
-                    if (!state.filters[filterKey].includes(value)) {
-                        state.filters[filterKey].push(value);
                     }
-                    option.classList.add('selected');
-                } else {
-                    state.filters[filterKey] = state.filters[filterKey].filter(v => v !== value);
-                    option.classList.remove('selected');
+                });
+                checkbox.checked = true; // "Tout" reste coché
+            }
+        } else {
+            // Gestion normale d'une option
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                if (!state.filters[filterKey].includes(value)) {
+                    state.filters[filterKey].push(value);
                 }
-                
-                // Si une option spécifique est sélectionnée, décocher "Tout"
-                const allOption = optionsContainer.querySelector('.dropdown-option[data-value="__ALL__"]');
-                if (allOption) {
-                    const allCheckbox = allOption.querySelector('input[type="checkbox"]');
+                option.classList.add('selected');
+            } else {
+                state.filters[filterKey] = state.filters[filterKey].filter(v => v !== value);
+                option.classList.remove('selected');
+            }
+            
+            // Si une option spécifique est sélectionnée, décocher "Tout"
+            const allOption = freshContainer.querySelector('.dropdown-option[data-value="__ALL__"]');
+            if (allOption) {
+                const allCheckbox = allOption.querySelector('input[type="checkbox"]');
+                if (allCheckbox) {
                     allCheckbox.checked = state.filters[filterKey].length === 0;
                     if (state.filters[filterKey].length === 0) {
                         allOption.classList.add('selected');
@@ -470,18 +485,21 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
                     }
                 }
             }
-            
-            // Mettre à jour le texte du toggle
-            updateToggleText(toggleId, filterKey, defaultText);
-            
-            // Si changement de départements, recharger les communes
-            if (filterKey === 'departements') {
-                reloadCommunesOptions();
-            }
-            
-            // Appliquer les filtres
+        }
+        
+        // Mettre à jour le texte du toggle
+        updateToggleText(toggleId, filterKey, defaultText);
+        
+        // Si changement de départements, recharger les communes
+        if (filterKey === 'departements') {
+            reloadCommunesOptions();
+        }
+        
+        // Appliquer les filtres avec un léger délai pour éviter les appels multiples
+        clearTimeout(window.filterTimeout);
+        window.filterTimeout = setTimeout(() => {
             applyFilters();
-        });
+        }, 300);
     });
     
     // Mettre à jour le texte du toggle
@@ -528,6 +546,12 @@ async function reloadCommunesOptions() {
 }
 
 function applyFilters() {
+    // Éviter les appels multiples simultanés
+    if (window.applyingFilters) {
+        return;
+    }
+    window.applyingFilters = true;
+    
     // Invalider le cache
     state.cache = {};
     
@@ -535,22 +559,38 @@ function applyFilters() {
     document.querySelectorAll('.chart-container').forEach(container => {
         // Supprimer les données Plotly pour forcer le rechargement
         if (container.data) {
-            Plotly.purge(container);
+            try {
+                Plotly.purge(container);
+            } catch (e) {
+                console.warn('Erreur purge Plotly:', e);
+            }
         }
     });
     
-    // Réinitialiser la carte
-    if (window.top10Map) {
-        try {
-            window.top10Map.remove();
-        } catch (e) {
-            console.warn('Erreur suppression carte:', e);
+    // Réinitialiser la carte complètement
+    const mapContainer = document.getElementById('mapTop10');
+    if (mapContainer) {
+        // Détruire la carte Leaflet si elle existe
+        if (window.top10Map) {
+            try {
+                window.top10Map.remove();
+            } catch (e) {
+                console.warn('Erreur suppression carte:', e);
+            }
+            window.top10Map = null;
         }
-        window.top10Map = null;
+        
+        // Nettoyer le conteneur
+        if (mapContainer._leaflet_id) {
+            mapContainer._leaflet_id = null;
+        }
+        mapContainer.innerHTML = '';
     }
     
     // Recharger toutes les données
-    loadAllData();
+    loadAllData().finally(() => {
+        window.applyingFilters = false;
+    });
 }
 
 async function loadLastUpdate() {
