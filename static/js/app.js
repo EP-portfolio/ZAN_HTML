@@ -182,14 +182,20 @@ function switchTabInSection(sectionEl, tabId) {
         // Re-render le graphique si nécessaire
         setTimeout(() => {
             resizeCharts();
-            // Charger les données si le graphique n'existe pas encore
+            // Charger les données (forcer le rechargement si les filtres ont changé)
             const chartContainer = activePanel.querySelector('.chart-container');
             if (chartContainer) {
                 const chartId = chartContainer.id;
                 const chartEl = document.getElementById(chartId);
-                if (chartEl && (!chartEl.data || chartEl.data.length === 0)) {
-                    loadChartData(tabId);
-                }
+                // Toujours recharger pour s'assurer que les filtres sont appliqués
+                loadChartData(tabId, true);
+            }
+            
+            // Pour la carte Top 10, vérifier si elle existe
+            const mapContainer = activePanel.querySelector('#mapTop10');
+            if (mapContainer && tabId === 'top10') {
+                // Recharger la carte si nécessaire
+                loadTop10Data();
             }
         }, 150);
     } else {
@@ -197,12 +203,12 @@ function switchTabInSection(sectionEl, tabId) {
     }
 }
 
-async function loadChartData(tabId) {
+async function loadChartData(tabId, forceReload = false) {
     const chartEl = document.querySelector(`#tab-${tabId} .chart-container`);
     if (!chartEl) return;
     
-    // Vérifier si le graphique existe déjà
-    if (chartEl.data && chartEl.data.length > 0) {
+    // Vérifier si le graphique existe déjà (sauf si on force le rechargement)
+    if (!forceReload && chartEl.data && chartEl.data.length > 0) {
         return; // Déjà chargé
     }
     
@@ -377,11 +383,21 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
     // Filtrer les valeurs sélectionnées qui ne sont plus disponibles
     state.filters[filterKey] = state.filters[filterKey].filter(v => options.includes(v));
     
-    // Créer les options
+    // Créer les options avec option "Tout" en premier
     if (options.length === 0) {
         optionsContainer.innerHTML = '<div class="dropdown-option" style="color: var(--color-text-muted); cursor: default;">Aucune option disponible</div>';
     } else {
-        optionsContainer.innerHTML = options.map(opt => {
+        // Option "Tout" pour réinitialiser les filtres
+        const allSelected = state.filters[filterKey].length === 0;
+        const allOptions = [
+            `<div class="dropdown-option ${allSelected ? 'selected' : ''}" data-value="__ALL__" style="font-weight: bold; border-bottom: 1px solid var(--color-border); margin-bottom: 4px;">
+                <input type="checkbox" id="check_${filterKey}_ALL" ${allSelected ? 'checked' : ''}>
+                <label for="check_${filterKey}_ALL">Tout</label>
+            </div>`
+        ];
+        
+        // Ajouter les autres options
+        allOptions.push(...options.map(opt => {
             const isSelected = state.filters[filterKey].includes(opt);
             const safeId = opt.replace(/[^a-zA-Z0-9]/g, '_');
             return `
@@ -390,7 +406,9 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
                     <label for="check_${filterKey}_${safeId}">${opt}</label>
                 </div>
             `;
-        }).join('');
+        }));
+        
+        optionsContainer.innerHTML = allOptions.join('');
     }
     
     // Gérer les clics sur les options
@@ -402,16 +420,55 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
             
             if (!value) return; // Ignorer les options sans valeur
             
-            checkbox.checked = !checkbox.checked;
-            
-            if (checkbox.checked) {
-                if (!state.filters[filterKey].includes(value)) {
-                    state.filters[filterKey].push(value);
+            // Gérer l'option "Tout"
+            if (value === '__ALL__') {
+                if (checkbox.checked) {
+                    // Désélectionner "Tout" = sélectionner toutes les options
+                    state.filters[filterKey] = [...options];
+                    // Mettre à jour toutes les checkboxes
+                    optionsContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
+                        if (opt.dataset.value !== '__ALL__') {
+                            const optCheckbox = opt.querySelector('input[type="checkbox"]');
+                            optCheckbox.checked = true;
+                            opt.classList.add('selected');
+                        }
+                    });
+                } else {
+                    // Sélectionner "Tout" = désélectionner toutes les options
+                    state.filters[filterKey] = [];
+                    // Mettre à jour toutes les checkboxes
+                    optionsContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
+                        const optCheckbox = opt.querySelector('input[type="checkbox"]');
+                        optCheckbox.checked = false;
+                        opt.classList.remove('selected');
+                    });
+                    checkbox.checked = true; // "Tout" reste coché
                 }
-                option.classList.add('selected');
             } else {
-                state.filters[filterKey] = state.filters[filterKey].filter(v => v !== value);
-                option.classList.remove('selected');
+                // Gestion normale d'une option
+                checkbox.checked = !checkbox.checked;
+                
+                if (checkbox.checked) {
+                    if (!state.filters[filterKey].includes(value)) {
+                        state.filters[filterKey].push(value);
+                    }
+                    option.classList.add('selected');
+                } else {
+                    state.filters[filterKey] = state.filters[filterKey].filter(v => v !== value);
+                    option.classList.remove('selected');
+                }
+                
+                // Si une option spécifique est sélectionnée, décocher "Tout"
+                const allOption = optionsContainer.querySelector('.dropdown-option[data-value="__ALL__"]');
+                if (allOption) {
+                    const allCheckbox = allOption.querySelector('input[type="checkbox"]');
+                    allCheckbox.checked = state.filters[filterKey].length === 0;
+                    if (state.filters[filterKey].length === 0) {
+                        allOption.classList.add('selected');
+                    } else {
+                        allOption.classList.remove('selected');
+                    }
+                }
             }
             
             // Mettre à jour le texte du toggle
@@ -474,7 +531,25 @@ function applyFilters() {
     // Invalider le cache
     state.cache = {};
     
-    // Recharger les données
+    // Réinitialiser les graphiques pour forcer le rechargement
+    document.querySelectorAll('.chart-container').forEach(container => {
+        // Supprimer les données Plotly pour forcer le rechargement
+        if (container.data) {
+            Plotly.purge(container);
+        }
+    });
+    
+    // Réinitialiser la carte
+    if (window.top10Map) {
+        try {
+            window.top10Map.remove();
+        } catch (e) {
+            console.warn('Erreur suppression carte:', e);
+        }
+        window.top10Map = null;
+    }
+    
+    // Recharger toutes les données
     loadAllData();
 }
 
