@@ -404,6 +404,9 @@ body {
     cursor: pointer;
     position: relative;
     transition: color var(--transition-fast);
+    user-select: none;
+    -webkit-user-select: none;
+    z-index: 1;
 }
 
 .tab-btn:hover {

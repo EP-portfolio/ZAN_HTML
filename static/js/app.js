@@ -51,14 +51,21 @@ function initEventListeners() {
         });
     });
     
-    // Onglets section 1
-    document.querySelectorAll('.charts-section:nth-of-type(1) .tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab, 1));
-    });
-    
-    // Onglets section 2
-    document.querySelectorAll('.charts-section:nth-of-type(2) .tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab, 2));
+    // Onglets - méthode plus robuste
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tabId = btn.dataset.tab;
+            if (!tabId) return;
+            
+            const section = btn.closest('.charts-section');
+            if (section) {
+                switchTabInSection(section, tabId);
+            } else {
+                console.warn('Section non trouvée pour l\'onglet:', tabId);
+            }
+        });
     });
     
     // Recherche tableau
@@ -113,19 +120,90 @@ function updateMobilePerimetre() {
 // ONGLETS
 // ============================================
 
-function switchTab(tabId, section) {
-    const sectionEl = document.querySelectorAll('.charts-section')[section - 1];
-    if (!sectionEl) return;
+function switchTabInSection(sectionEl, tabId) {
+    if (!sectionEl || !tabId) {
+        console.warn('switchTabInSection: paramètres manquants', { sectionEl, tabId });
+        return;
+    }
     
-    sectionEl.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    // Désactiver tous les onglets de cette section
+    const allBtns = sectionEl.querySelectorAll('.tab-btn');
+    allBtns.forEach(btn => {
+        btn.classList.remove('active');
     });
     
-    sectionEl.querySelectorAll('.tab-panel').forEach(panel => {
-        panel.classList.toggle('active', panel.id === `tab-${tabId}`);
+    // Activer l'onglet cliqué
+    const activeBtn = sectionEl.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    } else {
+        console.warn(`Onglet non trouvé: ${tabId} dans la section`);
+        return;
+    }
+    
+    // Masquer tous les panneaux de cette section
+    const allPanels = sectionEl.querySelectorAll('.tab-panel');
+    allPanels.forEach(panel => {
+        panel.classList.remove('active');
     });
     
-    setTimeout(resizeCharts, 100);
+    // Afficher le panneau correspondant
+    const activePanel = sectionEl.querySelector(`#tab-${tabId}`);
+    if (activePanel) {
+        activePanel.classList.add('active');
+        
+        // Re-render le graphique si nécessaire
+        setTimeout(() => {
+            resizeCharts();
+            // Charger les données si le graphique n'existe pas encore
+            const chartContainer = activePanel.querySelector('.chart-container');
+            if (chartContainer) {
+                const chartId = chartContainer.id;
+                const chartEl = document.getElementById(chartId);
+                if (chartEl && (!chartEl.data || chartEl.data.length === 0)) {
+                    loadChartData(tabId);
+                }
+            }
+        }, 150);
+    } else {
+        console.warn(`Panneau non trouvé: #tab-${tabId}`);
+    }
+}
+
+async function loadChartData(tabId) {
+    const chartEl = document.querySelector(`#tab-${tabId} .chart-container`);
+    if (!chartEl) return;
+    
+    // Vérifier si le graphique existe déjà
+    if (chartEl.data && chartEl.data.length > 0) {
+        return; // Déjà chargé
+    }
+    
+    // Charger les données selon l'onglet
+    try {
+        switch(tabId) {
+            case 'evolution':
+                await loadEvolutionData();
+                break;
+            case 'repartition':
+                await loadRepartitionData();
+                break;
+            case 'top10':
+                await loadTop10Data();
+                break;
+            case 'typologie2':
+                await loadTypologieData();
+                break;
+            case 'risques':
+                await loadRisquesData();
+                break;
+            case 'densification':
+                await loadDensificationData();
+                break;
+        }
+    } catch (error) {
+        console.error(`Erreur chargement graphique ${tabId}:`, error);
+    }
 }
 
 // ============================================
@@ -136,18 +214,19 @@ async function loadAllData() {
     state.loading = true;
     
     try {
+        // Charger les métriques et trajectoire en premier
+        await loadMetrics();
+        await loadTrajectory();
+        
+        // Charger les graphiques de la section active
         await Promise.all([
-            loadMetrics(),
-            loadTrajectory(),
-            loadEvolutionData(),
-            loadRepartitionData(),
-            loadTop10Data(),
-            loadTypologieData(),
-            loadRisquesData(),
-            loadDensificationData(),
+            loadEvolutionData(),  // Onglet actif par défaut
+            loadTypologieData(),  // Onglet actif par défaut section 2
             loadBenchmarkData(),
             loadCommunesData()
         ]);
+        
+        // Les autres graphiques seront chargés à la demande lors du clic sur les onglets
     } catch (error) {
         console.error('Erreur chargement:', error);
     } finally {

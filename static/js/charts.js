@@ -51,11 +51,15 @@ function getBaseLayout() {
  * Graphique Trajectoire ZAN
  */
 function renderTrajectoryChart(containerId, data) {
+    // S'assurer que les années sont des nombres
+    const annees_projection = data.annees_projection.map(a => typeof a === 'string' ? parseInt(a) : a);
+    const annees_reelles = data.annees_reelles.map(a => typeof a === 'string' ? parseInt(a) : a);
+    
     const traces = [
         {
             type: 'scatter',
             mode: 'lines',
-            x: data.annees_projection,
+            x: annees_projection,
             y: data.trajectoire_max,
             name: 'Enveloppe maximale',
             line: { color: COLORS.orange, width: 2, dash: 'dash' },
@@ -65,7 +69,7 @@ function renderTrajectoryChart(containerId, data) {
         {
             type: 'scatter',
             mode: 'lines+markers',
-            x: data.annees_reelles,
+            x: annees_reelles,
             y: data.conso_reelle,
             name: 'Consommation réelle',
             line: { color: COLORS.blue, width: 3 },
@@ -84,12 +88,15 @@ function renderTrajectoryChart(containerId, data) {
         },
         xaxis: {
             ...getBaseLayout().xaxis,
-            title: { text: 'Année', font: { size: 12 } }
+            title: { text: 'Année', font: { size: 12 } },
+            type: 'linear',
+            dtick: 1,
+            tickformat: 'd'
         },
         yaxis: {
             ...getBaseLayout().yaxis,
             title: { text: 'Hectares cumulés', font: { size: 12 } },
-            range: [0, data.enveloppe * 1.1]
+            range: [0, Math.max(data.enveloppe * 1.1, Math.max(...data.conso_reelle) * 1.2)]
         }
     };
     

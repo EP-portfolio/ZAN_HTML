@@ -226,30 +226,30 @@ def get_typologie_data(df):
 def get_trajectory_data(df):
     """Données pour le graphique de trajectoire ZAN"""
     cols_evolution = [
-        ("naf21art22", "2021-22"), ("naf22art23", "2022-23"), ("naf23art24", "2023-24"),
+        ("naf21art22", 2022), ("naf22art23", 2023), ("naf23art24", 2024),
     ]
     
     # Consommation cumulée depuis 2021
     cumul = 0
-    annees = ["2021"]
+    annees_reelles = [2021]
     conso_reelle = [0]
     
-    for col, label in cols_evolution:
+    for col, annee in cols_evolution:
         if col in df.columns:
             cumul += df[col].sum() / 10000
-            annees.append(label.split("-")[1])
+            annees_reelles.append(annee)
             conso_reelle.append(round(cumul, 2))
     
     # Projection jusqu'en 2031
     metrics = calculate_metrics(df)
     enveloppe = metrics["enveloppe_zan"]
     
-    # Trajectoire linéaire théorique
-    trajectoire = [round(enveloppe * i / 10, 2) for i in range(11)]
-    annees_projection = [str(2021 + i) for i in range(11)]
+    # Trajectoire linéaire théorique (2021-2031)
+    annees_projection = list(range(2021, 2032))
+    trajectoire = [round(enveloppe * (i - 2021) / 10, 2) for i in annees_projection]
     
     return {
-        "annees_reelles": annees,
+        "annees_reelles": annees_reelles,
         "conso_reelle": conso_reelle,
         "annees_projection": annees_projection,
         "trajectoire_max": trajectoire,
