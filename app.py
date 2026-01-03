@@ -223,6 +223,204 @@ def get_typologie_data(df):
     return result
 
 
+def get_trajectory_data(df):
+    """Données pour le graphique de trajectoire ZAN"""
+    cols_evolution = [
+        ("naf21art22", "2021-22"), ("naf22art23", "2022-23"), ("naf23art24", "2023-24"),
+    ]
+    
+    # Consommation cumulée depuis 2021
+    cumul = 0
+    annees = ["2021"]
+    conso_reelle = [0]
+    
+    for col, label in cols_evolution:
+        if col in df.columns:
+            cumul += df[col].sum() / 10000
+            annees.append(label.split("-")[1])
+            conso_reelle.append(round(cumul, 2))
+    
+    # Projection jusqu'en 2031
+    metrics = calculate_metrics(df)
+    enveloppe = metrics["enveloppe_zan"]
+    
+    # Trajectoire linéaire théorique
+    trajectoire = [round(enveloppe * i / 10, 2) for i in range(11)]
+    annees_projection = [str(2021 + i) for i in range(11)]
+    
+    return {
+        "annees_reelles": annees,
+        "conso_reelle": conso_reelle,
+        "annees_projection": annees_projection,
+        "trajectoire_max": trajectoire,
+        "enveloppe": round(enveloppe, 2)
+    }
+
+
+def get_risques_communes(df, n=15):
+    """Données pour la jauge ZAN par commune"""
+    df_calc = df.copy()
+    
+    # Calcul de l'enveloppe individuelle par commune
+    cols_ref = ["naf11art12", "naf12art13", "naf13art14", "naf14art15", "naf15art16",
+                "naf16art17", "naf17art18", "naf18art19", "naf19art20", "naf20art21"]
+    cols_recent = ["naf21art22", "naf22art23", "naf23art24"]
+    
+    df_calc["conso_ref"] = 0
+    for col in cols_ref:
+        if col in df_calc.columns:
+            df_calc["conso_ref"] += df_calc[col] / 10000
+    
+    df_calc["enveloppe_commune"] = df_calc["conso_ref"] * 0.5
+    
+    df_calc["conso_2124"] = 0
+    for col in cols_recent:
+        if col in df_calc.columns:
+            df_calc["conso_2124"] += df_calc[col] / 10000
+    
+    # Taux de consommation
+    df_calc["taux_conso"] = np.where(
+        df_calc["enveloppe_commune"] > 0,
+        (df_calc["conso_2124"] / df_calc["enveloppe_commune"]) * 100,
+        0
+    )
+    
+    # Top communes à risque
+    df_risque = df_calc.nlargest(n, "taux_conso")[["idcomtxt", "enveloppe_commune", "conso_2124", "taux_conso"]].copy()
+    
+    result = []
+    for _, row in df_risque.iterrows():
+        taux = row["taux_conso"]
+        if taux < 30:
+            status = "conforme"
+        elif taux < 50:
+            status = "vigilance"
+        else:
+            status = "critique"
+        
+        result.append({
+            "commune": row["idcomtxt"],
+            "enveloppe": round(row["enveloppe_commune"], 2),
+            "consomme": round(row["conso_2124"], 2),
+            "taux": round(taux, 1),
+            "status": status
+        })
+    
+    return result
+
+
+def get_densification_data(df):
+    """Données pour l'évolution de la densification"""
+    # Périodes
+    periodes = ["2011-2015", "2015-2018", "2018-2021", "2021-2024"]
+    
+    # Calcul par période
+    cols_periodes = [
+        (["naf11art12", "naf12art13", "naf13art14", "naf14art15"], ["pop15"]),
+        (["naf15art16", "naf16art17", "naf17art18"], ["pop15", "pop21"]),
+        (["naf18art19", "naf19art20", "naf20art21"], ["pop21"]),
+        (["naf21art22", "naf22art23", "naf23art24"], ["pop21"]),
+    ]
+    
+    efficiences = []
+    for artif_cols, pop_cols in cols_periodes:
+        artif = sum(df[col].sum() / 10000 for col in artif_cols if col in df.columns)
+        pop = df[pop_cols[-1]].sum() if pop_cols else 0
+        
+        # Estimation évolution pop par période
+        if len(pop_cols) == 2:
+            evol = df[pop_cols[1]].sum() - df[pop_cols[0]].sum()
+        else:
+            evol = df["pop1521"].sum() / 2  # Approximation
+        
+        if evol > 0:
+            eff = (artif * 10000) / evol
+        else:
+            eff = 0
+        
+        efficiences.append(round(eff, 0))
+    
+    return {
+        "periodes": periodes,
+        "efficiences": efficiences,
+        "objectif": 200  # Seuil ZAN recommandé
+    }
+
+
+def get_benchmark_data():
+    """Données pour le radar benchmark SCOT vs CCPDA"""
+    if DF_SCOT is None or DF_CC is None:
+        return None
+    
+    metrics_scot = calculate_metrics(DF_SCOT)
+    metrics_cc = calculate_metrics(DF_CC)
+    
+    # Normalisation pour radar (0-100)
+    def normalize(val, max_val):
+        return min(100, (val / max_val) * 100) if max_val > 0 else 0
+    
+    # Critères
+    max_artif = max(metrics_scot["artif_total_ha"], metrics_cc["artif_total_ha"])
+    max_pop = max(metrics_scot["population"], metrics_cc["population"])
+    max_eff = max(metrics_scot["conso_par_hab"], metrics_cc["conso_par_hab"])
+    max_taux = max(metrics_scot["taux_enveloppe"], metrics_cc["taux_enveloppe"])
+    
+    categories = ["Artificialisation", "Population", "Efficience", "Taux ZAN", "Reste disponible"]
+    
+    scot_values = [
+        normalize(metrics_scot["artif_total_ha"], max_artif),
+        normalize(metrics_scot["population"], max_pop),
+        100 - normalize(metrics_scot["conso_par_hab"], max_eff),  # Inversé (moins = mieux)
+        100 - normalize(metrics_scot["taux_enveloppe"], 100),  # Inversé
+        normalize(metrics_scot["reste_disponible"], metrics_scot["enveloppe_zan"]) if metrics_scot["enveloppe_zan"] > 0 else 0,
+    ]
+    
+    cc_values = [
+        normalize(metrics_cc["artif_total_ha"], max_artif),
+        normalize(metrics_cc["population"], max_pop),
+        100 - normalize(metrics_cc["conso_par_hab"], max_eff),
+        100 - normalize(metrics_cc["taux_enveloppe"], 100),
+        normalize(metrics_cc["reste_disponible"], metrics_cc["enveloppe_zan"]) if metrics_cc["enveloppe_zan"] > 0 else 0,
+    ]
+    
+    return {
+        "categories": categories,
+        "scot": [round(v, 1) for v in scot_values],
+        "ccpda": [round(v, 1) for v in cc_values],
+        "scot_label": "SCoT Rives du Rhône",
+        "ccpda_label": "CC Porte DrômArdèche"
+    }
+
+
+def get_communes_table(df):
+    """Données pour le tableau des communes"""
+    cols = ["idcomtxt", "iddeptxt", "pop21", "artif_total_ha", "art09hab24", "art09act24"]
+    df_table = df[cols].copy()
+    
+    # Conversion
+    for col in ["art09hab24", "art09act24"]:
+        if col in df_table.columns:
+            if df_table[col].max() > 1000:
+                df_table[col] = df_table[col] / 10000
+    
+    df_table = df_table.rename(columns={
+        "idcomtxt": "commune",
+        "iddeptxt": "departement",
+        "pop21": "population",
+        "artif_total_ha": "total_ha",
+        "art09hab24": "habitat_ha",
+        "art09act24": "activites_ha"
+    })
+    
+    # Arrondir
+    for col in ["total_ha", "habitat_ha", "activites_ha"]:
+        df_table[col] = df_table[col].round(2)
+    
+    df_table["population"] = df_table["population"].astype(int)
+    
+    return df_table.sort_values("total_ha", ascending=False).to_dict("records")
+
+
 # ============================================
 # ROUTES
 # ============================================
@@ -295,6 +493,66 @@ def api_typologie():
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_typologie_data(df))
+
+
+@app.route("/api/trajectory")
+def api_trajectory():
+    """API: Trajectoire ZAN"""
+    perimetre = request.args.get("perimetre", "scot")
+    df = DF_SCOT if perimetre == "scot" else DF_CC
+    
+    if df is None:
+        return jsonify({"error": "Données non disponibles"}), 500
+    
+    return jsonify(get_trajectory_data(df))
+
+
+@app.route("/api/risques")
+def api_risques():
+    """API: Risques communaux"""
+    perimetre = request.args.get("perimetre", "scot")
+    n = int(request.args.get("n", 15))
+    df = DF_SCOT if perimetre == "scot" else DF_CC
+    
+    if df is None:
+        return jsonify({"error": "Données non disponibles"}), 500
+    
+    return jsonify(get_risques_communes(df, n))
+
+
+@app.route("/api/densification")
+def api_densification():
+    """API: Évolution densification"""
+    perimetre = request.args.get("perimetre", "scot")
+    df = DF_SCOT if perimetre == "scot" else DF_CC
+    
+    if df is None:
+        return jsonify({"error": "Données non disponibles"}), 500
+    
+    return jsonify(get_densification_data(df))
+
+
+@app.route("/api/benchmark")
+def api_benchmark():
+    """API: Benchmark radar SCOT vs CCPDA"""
+    data = get_benchmark_data()
+    
+    if data is None:
+        return jsonify({"error": "Données non disponibles"}), 500
+    
+    return jsonify(data)
+
+
+@app.route("/api/communes")
+def api_communes():
+    """API: Tableau des communes"""
+    perimetre = request.args.get("perimetre", "scot")
+    df = DF_SCOT if perimetre == "scot" else DF_CC
+    
+    if df is None:
+        return jsonify({"error": "Données non disponibles"}), 500
+    
+    return jsonify(get_communes_table(df))
 
 
 # ============================================

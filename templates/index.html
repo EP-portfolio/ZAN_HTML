@@ -6,18 +6,14 @@
     <meta name="description" content="Dashboard de suivi de l'artificialisation des sols - Objectif ZAN 2031">
     <title>Dashboard ZAN - Artificialisation des Sols</title>
     
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
     
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     
-    <!-- Styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
@@ -68,9 +64,7 @@
         <!-- Mobile Header -->
         <header class="mobile-header">
             <button class="menu-toggle" id="menuToggle" aria-label="Menu">
-                <span></span>
-                <span></span>
-                <span></span>
+                <span></span><span></span><span></span>
             </button>
             <h1 class="mobile-title">Dashboard ZAN</h1>
             <div class="mobile-perimetre" id="mobilePerimetre">SCOT</div>
@@ -78,7 +72,7 @@
         
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Header Section -->
+            <!-- Header -->
             <header class="content-header">
                 <div class="header-info">
                     <h1 class="page-title">Indicateurs Clés</h1>
@@ -91,7 +85,7 @@
                 </div>
             </header>
             
-            <!-- KPIs Section -->
+            <!-- SECTION 1: KPIs -->
             <section class="kpi-section">
                 <div class="kpi-grid">
                     <div class="kpi-card" data-color="blue">
@@ -125,75 +119,144 @@
                 </div>
             </section>
             
-            <!-- Charts Section -->
+            <!-- SECTION 2: Trajectoire ZAN -->
+            <section class="section-block">
+                <div class="section-header">
+                    <h2 class="section-title">Trajectoire vers l'objectif ZAN 2031</h2>
+                    <p class="section-subtitle">Suivi de la consommation d'espaces par rapport à l'objectif de réduction de 50%</p>
+                </div>
+                
+                <div class="trajectory-grid">
+                    <div class="chart-container chart-large" id="chartTrajectory"></div>
+                    <div class="trajectory-info">
+                        <div class="info-card">
+                            <h3>OBJECTIF -50% (LOI CLIMAT)</h3>
+                            <table class="info-table">
+                                <tr><td>Période de référence</td><td id="infoRefPeriod">2011-2021</td></tr>
+                                <tr><td>Consommation de référence</td><td id="infoConsoRef">-- ha</td></tr>
+                                <tr><td>Enveloppe 2021-2031</td><td id="infoEnveloppe">-- ha</td></tr>
+                                <tr><td>Déjà consommé (2021-2024)</td><td id="infoConso2124">-- ha</td></tr>
+                                <tr class="highlight"><td>Reste disponible</td><td id="infoReste">-- ha</td></tr>
+                            </table>
+                        </div>
+                        <div class="progress-card">
+                            <div class="progress-header">
+                                <span>Progression</span>
+                                <span id="progressValue" class="progress-value">--%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <div class="progress-status" id="progressStatus">--</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- SECTION 3: Analyse Détaillée -->
             <section class="charts-section">
-                <!-- Tabs Navigation -->
+                <div class="section-header">
+                    <h2 class="section-title">Analyse Détaillée</h2>
+                    <p class="section-subtitle">Exploration approfondie des données d'artificialisation</p>
+                </div>
+                
                 <div class="tabs-nav">
                     <button class="tab-btn active" data-tab="evolution">Évolution Annuelle</button>
                     <button class="tab-btn" data-tab="repartition">Répartition</button>
                     <button class="tab-btn" data-tab="top10">Top Communes</button>
-                    <button class="tab-btn" data-tab="typologie">Typologie</button>
                 </div>
                 
-                <!-- Tab Contents -->
                 <div class="tabs-content">
-                    <!-- Evolution Tab -->
                     <div class="tab-panel active" id="tab-evolution">
-                        <div class="chart-header">
-                            <h2 class="chart-title">Évolution de la consommation d'espaces NAF</h2>
-                            <p class="chart-subtitle">Consommation annuelle en hectares (2009-2024)</p>
-                        </div>
                         <div class="chart-container" id="chartEvolution"></div>
                     </div>
-                    
-                    <!-- Repartition Tab -->
                     <div class="tab-panel" id="tab-repartition">
-                        <div class="chart-header">
-                            <h2 class="chart-title">Répartition par destination</h2>
-                            <p class="chart-subtitle">Distribution selon l'usage des espaces artificialisés</p>
-                        </div>
                         <div class="chart-wrapper">
                             <div class="chart-container chart-donut" id="chartRepartition"></div>
                             <div class="chart-legend" id="legendRepartition"></div>
                         </div>
                     </div>
-                    
-                    <!-- Top 10 Tab -->
                     <div class="tab-panel" id="tab-top10">
-                        <div class="chart-header">
-                            <h2 class="chart-title">Top 10 Communes</h2>
-                            <p class="chart-subtitle">Communes les plus artificialisées par destination (2009-2024)</p>
-                        </div>
                         <div class="chart-container chart-horizontal" id="chartTop10"></div>
                     </div>
-                    
-                    <!-- Typologie Tab -->
-                    <div class="tab-panel" id="tab-typologie">
-                        <div class="chart-header">
-                            <h2 class="chart-title">Analyse par Typologie Territoriale</h2>
-                            <p class="chart-subtitle">Répartition selon la classification INSEE AAV 2020</p>
-                        </div>
+                </div>
+            </section>
+            
+            <!-- SECTION 4: Analyses Avancées -->
+            <section class="charts-section">
+                <div class="section-header">
+                    <h2 class="section-title">Analyses Avancées</h2>
+                    <p class="section-subtitle">Indicateurs stratégiques pour le pilotage territorial</p>
+                </div>
+                
+                <div class="tabs-nav">
+                    <button class="tab-btn active" data-tab="typologie2">Analyse par Typologie</button>
+                    <button class="tab-btn" data-tab="risques">Risques Communaux</button>
+                    <button class="tab-btn" data-tab="densification">Évolution Densification</button>
+                </div>
+                
+                <div class="tabs-content">
+                    <div class="tab-panel active" id="tab-typologie2">
                         <div class="chart-container" id="chartTypologie"></div>
                         <div class="typologie-cards" id="typologieCards"></div>
                     </div>
+                    <div class="tab-panel" id="tab-risques">
+                        <div class="chart-container chart-horizontal" id="chartRisques"></div>
+                    </div>
+                    <div class="tab-panel" id="tab-densification">
+                        <div class="chart-container" id="chartDensification"></div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- SECTION 5: Benchmark -->
+            <section class="section-block">
+                <div class="section-header">
+                    <h2 class="section-title">Benchmark Territorial</h2>
+                    <p class="section-subtitle">Comparaison multi-critères entre SCoT et Communauté de Communes</p>
+                </div>
+                <div class="chart-container chart-radar" id="chartBenchmark"></div>
+            </section>
+            
+            <!-- SECTION 6: Tableau des données -->
+            <section class="section-block">
+                <div class="section-header">
+                    <h2 class="section-title">Données par Commune</h2>
+                    <p class="section-subtitle">Tableau détaillé avec options de recherche et tri</p>
+                </div>
+                <div class="table-controls">
+                    <input type="text" id="searchCommune" class="search-input" placeholder="Rechercher une commune...">
+                    <button class="btn-export" id="btnExport">Exporter CSV</button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="communesTable">
+                        <thead>
+                            <tr>
+                                <th data-sort="commune">Commune</th>
+                                <th data-sort="departement">Département</th>
+                                <th data-sort="population">Population</th>
+                                <th data-sort="total_ha">Total (ha)</th>
+                                <th data-sort="habitat_ha">Habitat (ha)</th>
+                                <th data-sort="activites_ha">Activités (ha)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="communesTableBody"></tbody>
+                    </table>
                 </div>
             </section>
             
             <!-- Footer -->
             <footer class="content-footer">
-                <p class="footer-text">
-                    Source : Observatoire de l'artificialisation des sols | Données : 2009-2024
-                </p>
+                <div class="footer-main">DASHBOARD DE PILOTAGE ZAN</div>
+                <div class="footer-sub">Suivi de l'artificialisation des sols - Objectif Zéro Artificialisation Nette</div>
+                <div class="footer-source">Source : Observatoire de l'artificialisation des sols | Données : 2009-2024</div>
             </footer>
         </main>
     </div>
     
-    <!-- Overlay for mobile menu -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     
-    <!-- Scripts -->
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
-

@@ -555,18 +555,264 @@ body {
 .typo-badge.critique { background: var(--color-red); color: var(--color-bg-primary); }
 
 /* ============================================
+   SECTION BLOCKS
+   ============================================ */
+.section-block {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.section-header {
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.section-title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.section-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+/* ============================================
+   TRAJECTORY SECTION
+   ============================================ */
+.trajectory-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-lg);
+}
+
+.chart-large {
+    height: clamp(300px, 40vh, 450px);
+}
+
+.trajectory-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.info-card {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-orange);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.info-card h3 {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.info-table {
+    width: 100%;
+}
+
+.info-table td {
+    padding: var(--spacing-xs) 0;
+    font-size: var(--font-size-sm);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.info-table td:first-child {
+    color: var(--color-text-muted);
+}
+
+.info-table td:last-child {
+    text-align: right;
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.info-table tr.highlight td {
+    border-bottom: none;
+    padding-top: var(--spacing-sm);
+}
+
+.info-table tr.highlight td:last-child {
+    color: var(--color-green);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+}
+
+.progress-card {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.progress-value {
+    font-weight: 700;
+    font-size: var(--font-size-lg);
+}
+
+.progress-bar {
+    height: 14px;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--color-green);
+    border-radius: var(--radius-md);
+    transition: width 0.5s ease, background 0.3s ease;
+}
+
+.progress-status {
+    text-align: center;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-dim);
+    margin-top: var(--spacing-sm);
+}
+
+/* ============================================
+   TABLE SECTION
+   ============================================ */
+.table-controls {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--color-blue);
+}
+
+.btn-export {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--color-blue);
+    color: var(--color-text-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.btn-export:hover {
+    background: #3a9ec7;
+}
+
+.table-container {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.data-table th {
+    background: var(--color-bg-primary);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    text-align: left;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 2px solid var(--color-border);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.data-table th:hover {
+    color: var(--color-text-primary);
+}
+
+.data-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+.data-table tr:hover td {
+    background: rgba(46, 134, 171, 0.1);
+}
+
+.data-table td:nth-child(n+3) {
+    text-align: right;
+    font-family: 'Inter', monospace;
+}
+
+/* Chart variants */
+.chart-radar {
+    height: clamp(350px, 50vh, 500px);
+}
+
+/* ============================================
    FOOTER
    ============================================ */
 .content-footer {
     margin-top: var(--spacing-xl);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--color-border);
+    padding: var(--spacing-lg);
+    border-top: 2px solid var(--color-border);
     text-align: center;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
 }
 
-.footer-text {
+.footer-main {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.footer-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-sm);
+}
+
+.footer-source {
     font-size: var(--font-size-xs);
     color: var(--color-text-dim);
+    font-style: italic;
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
 }
 
 /* ============================================
@@ -759,6 +1005,18 @@ body {
     
     .typologie-cards {
         grid-template-columns: 1fr;
+    }
+    
+    .trajectory-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .table-controls {
+        flex-direction: column;
+    }
+    
+    .search-input {
+        width: 100%;
     }
 }
 
