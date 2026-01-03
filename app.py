@@ -8,6 +8,7 @@ from flask import Flask, render_template, jsonify, request
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import requests
 
 app = Flask(__name__)
 
@@ -204,7 +205,10 @@ def get_repartition_data(df):
 
 def get_top_communes(df, n=10):
     """Top N communes les plus artificialisées"""
-    df_top = df.nlargest(n, "artif_total_ha")[["idcomtxt", "artif_total_ha", "art09hab24", "art09act24", "art09mix24", "art09rou24"]].copy()
+    cols_needed = ["idcom", "idcomtxt", "artif_total_ha", "art09hab24", "art09act24", "art09mix24", "art09rou24"]
+    cols_available = [c for c in cols_needed if c in df.columns]
+    
+    df_top = df.nlargest(n, "artif_total_ha")[cols_available].copy()
     
     for col in ["art09hab24", "art09act24", "art09mix24", "art09rou24"]:
         if col in df_top.columns:
@@ -214,6 +218,7 @@ def get_top_communes(df, n=10):
     result = []
     for _, row in df_top.iterrows():
         result.append({
+            "code_insee": str(row["idcom"]).zfill(5) if "idcom" in row else None,
             "commune": row["idcomtxt"],
             "total": round(row["artif_total_ha"], 2),
             "habitat": round(row.get("art09hab24", 0), 2),
@@ -696,6 +701,36 @@ def api_communes():
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_communes_table(df))
+
+
+@app.route("/api/communes-coords")
+def api_communes_coords():
+    """API: Coordonnées géographiques des communes"""
+    codes_insee = request.args.getlist("codes")
+    
+    if not codes_insee:
+        return jsonify({"error": "Codes INSEE requis"}), 400
+    
+    coords_data = []
+    for code in codes_insee:
+        try:
+            resp = requests.get(
+                f"https://geo.api.gouv.fr/communes/{code}?fields=centre",
+                timeout=3
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if "centre" in data and data["centre"]:
+                    coords = data["centre"]["coordinates"]
+                    coords_data.append({
+                        "code": code,
+                        "lon": coords[0],
+                        "lat": coords[1]
+                    })
+        except:
+            continue
+    
+    return jsonify(coords_data)
 
 
 @app.route("/api/last-update")

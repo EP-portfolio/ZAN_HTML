@@ -475,12 +475,223 @@ function renderBenchmarkChart(containerId, data) {
     Plotly.newPlot(containerId, traces, layout, PLOTLY_CONFIG);
 }
 
+/**
+ * Crée un SVG pie chart
+ */
+function createSVGPieChart(values, colors, size) {
+    const total = values.reduce((a, b) => a + b, 0);
+    if (total === 0) {
+        return `<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="${COLORS.gray}" stroke="${COLORS.bgSecondary}" stroke-width="2"/></svg>`;
+    }
+    
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = size / 2 - 2;
+    
+    let svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`;
+    let startAngle = -90; // Commencer en haut
+    
+    values.forEach((val, i) => {
+        if (val <= 0) return;
+        
+        const angle = (val / total) * 360;
+        const endAngle = startAngle + angle;
+        
+        const startRad = (startAngle * Math.PI) / 180;
+        const endRad = (endAngle * Math.PI) / 180;
+        
+        const x1 = cx + r * Math.cos(startRad);
+        const y1 = cy + r * Math.sin(startRad);
+        const x2 = cx + r * Math.cos(endRad);
+        const y2 = cy + r * Math.sin(endRad);
+        
+        const largeArc = angle > 180 ? 1 : 0;
+        const path = `M ${cx},${cy} L ${x1},${y1} A ${r},${r} 0 ${largeArc},1 ${x2},${y2} Z`;
+        
+        svg += `<path d="${path}" fill="${colors[i]}" stroke="${COLORS.bgSecondary}" stroke-width="1"/>`;
+        startAngle = endAngle;
+    });
+    
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${COLORS.bgSecondary}" stroke-width="2"/>`;
+    svg += '</svg>';
+    
+    return svg;
+}
+
+/**
+ * Carte Top 10 communes avec pie charts
+ */
+async function renderTop10Map(containerId, data) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    // Nettoyer la carte précédente
+    container.innerHTML = '';
+    
+    // Détruire la carte Leaflet existante si elle existe
+    if (window.top10Map) {
+        window.top10Map.remove();
+        window.top10Map = null;
+    }
+    
+    // Récupérer les codes INSEE
+    const codesInsee = data.filter(d => d.code_insee).map(d => d.code_insee);
+    
+    if (codesInsee.length === 0) {
+        container.innerHTML = '<p style="color: var(--color-text-muted); padding: 2rem; text-align: center;">Aucune coordonnée disponible</p>';
+        return;
+    }
+    
+    // Récupérer les coordonnées
+    try {
+        const params = new URLSearchParams();
+        codesInsee.forEach(code => params.append('codes', code));
+        
+        const response = await fetch(`/api/communes-coords?${params.toString()}`);
+        if (!response.ok) throw new Error('Erreur récupération coordonnées');
+        
+        const coordsData = await response.json();
+        
+        if (coordsData.length < 2) {
+            container.innerHTML = '<p style="color: var(--color-text-muted); padding: 2rem; text-align: center;">Coordonnées insuffisantes pour afficher la carte</p>';
+            return;
+        }
+        
+        // Calculer le centre
+        const lats = coordsData.map(c => c.lat);
+        const lons = coordsData.map(c => c.lon);
+        const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+        const centerLon = lons.reduce((a, b) => a + b, 0) / lons.length;
+        
+        // Créer la carte avec fond sombre
+        const map = L.map(containerId, {
+            center: [centerLat, centerLon],
+            zoom: 9,
+            zoomControl: true
+        });
+        
+        // Stocker la référence pour pouvoir la détruire plus tard
+        window.top10Map = map;
+        
+        // Ajouter le fond de carte sombre (CartoDB Dark Matter)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Couleurs des destinations
+        const destNames = ['Habitat', 'Activités', 'Mixte', 'Routes'];
+        const destColors = [COLORS.green, COLORS.orange, COLORS.blue, COLORS.gray];
+        
+        // Créer un objet pour mapper les codes aux données
+        const dataMap = {};
+        data.forEach(d => {
+            if (d.code_insee) {
+                dataMap[d.code_insee] = d;
+            }
+        });
+        
+        // Trouver le max pour la taille des marqueurs
+        const maxArtif = Math.max(...data.map(d => d.total));
+        
+        // Ajouter les marqueurs avec pie charts
+        coordsData.forEach(coord => {
+            const communeData = dataMap[coord.code];
+            if (!communeData) return;
+            
+            // Taille proportionnelle (entre 30 et 70 pixels)
+            const size = Math.max(30, Math.min(70, 30 + (communeData.total / maxArtif) * 40));
+            
+            // Valeurs des destinations
+            const values = [
+                communeData.habitat || 0,
+                communeData.activites || 0,
+                communeData.mixte || 0,
+                communeData.routes || 0
+            ];
+            
+            // Créer le SVG pie chart
+            const svgPie = createSVGPieChart(values, destColors, size);
+            
+            // Popup HTML
+            let popupHtml = `
+                <div style="font-family: Inter, sans-serif; min-width: 180px;">
+                    <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: ${COLORS.textPrimary};">${communeData.commune}</div>
+                    <div style="font-size: 12px; color: ${COLORS.textMuted}; margin-bottom: 6px;">Total: <b>${communeData.total.toFixed(1)} ha</b></div>
+                    <hr style="margin: 6px 0; border-color: ${COLORS.border};">
+            `;
+            
+            destNames.forEach((name, i) => {
+                if (values[i] > 0) {
+                    popupHtml += `
+                        <div style="display: flex; align-items: center; margin: 3px 0;">
+                            <span style="width: 10px; height: 10px; background: ${destColors[i]}; border-radius: 2px; margin-right: 6px;"></span>
+                            <span style="flex: 1; font-size: 11px; color: ${COLORS.textSecondary};">${name}</span>
+                            <span style="font-weight: bold; font-size: 11px; color: ${COLORS.textPrimary};">${values[i].toFixed(1)} ha</span>
+                        </div>
+                    `;
+                }
+            });
+            
+            popupHtml += '</div>';
+            
+            // Créer l'icône personnalisée
+            const icon = L.divIcon({
+                html: svgPie,
+                className: 'pie-chart-marker',
+                iconSize: [size, size],
+                iconAnchor: [size/2, size/2]
+            });
+            
+            // Ajouter le marqueur
+            const marker = L.marker([coord.lat, coord.lon], { icon: icon })
+                .addTo(map)
+                .bindPopup(popupHtml)
+                .bindTooltip(`${communeData.commune}: ${communeData.total.toFixed(1)} ha`);
+            
+            // Ajouter un label avec le nom de la commune
+            const labelIcon = L.divIcon({
+                html: `<div style="font-size: 10px; font-weight: bold; color: ${COLORS.textPrimary}; text-align: center; background: rgba(30, 41, 59, 0.9); padding: 2px 6px; border-radius: 3px; white-space: nowrap;">${communeData.commune}</div>`,
+                className: 'commune-label',
+                iconSize: [120, 20],
+                iconAnchor: [60, 0]
+            });
+            
+            L.marker([coord.lat, coord.lon], { icon: labelIcon, zIndexOffset: -1000 })
+                .addTo(map);
+        });
+        
+        // Ajouter la légende
+        const legend = L.control({ position: 'bottomleft' });
+        legend.onAdd = function() {
+            const div = L.DomUtil.create('div', 'map-legend');
+            div.innerHTML = `
+                <div class="map-legend-title">DESTINATIONS</div>
+                ${destNames.map((name, i) => `
+                    <div class="map-legend-item">
+                        <span class="map-legend-color" style="background: ${destColors[i]};"></span>
+                        <span class="map-legend-label">${name}</span>
+                    </div>
+                `).join('')}
+            `;
+            return div;
+        };
+        legend.addTo(map);
+        
+    } catch (error) {
+        console.error('Erreur création carte:', error);
+        container.innerHTML = '<p style="color: var(--color-red); padding: 2rem; text-align: center;">Erreur lors du chargement de la carte</p>';
+    }
+}
+
 // Export
 window.Charts = {
     renderTrajectory: renderTrajectoryChart,
     renderEvolution: renderEvolutionChart,
     renderRepartition: renderRepartitionChart,
     renderTop10: renderTop10Chart,
+    renderTop10Map: renderTop10Map,
     renderTypologie: renderTypologieChart,
     renderRisques: renderRisquesChart,
     renderDensification: renderDensificationChart,

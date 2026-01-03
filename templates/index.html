@@ -14,6 +14,10 @@
     
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     
+    <!-- Leaflet pour les cartes -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
@@ -266,6 +270,13 @@
                     </div>
                     <div class="tab-panel" id="tab-top10">
                         <div class="chart-container chart-horizontal" id="chartTop10"></div>
+                        <div class="map-section" style="margin-top: 2rem;">
+                            <div class="map-header">
+                                <h3>Localisation des communes</h3>
+                                <p>Taille et couleurs proportionnelles aux destinations d'artificialisation</p>
+                            </div>
+                            <div id="mapTop10" class="map-container"></div>
+                        </div>
                     </div>
                 </div>
             </section>

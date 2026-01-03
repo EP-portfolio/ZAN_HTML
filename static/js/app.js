@@ -584,6 +584,8 @@ async function loadRepartitionData() {
 async function loadTop10Data() {
     const data = await fetchAPI('top-communes');
     Charts.renderTop10('chartTop10', data);
+    // Charger la carte avec les pie charts
+    await Charts.renderTop10Map('mapTop10', data);
 }
 
 async function loadTypologieData() {

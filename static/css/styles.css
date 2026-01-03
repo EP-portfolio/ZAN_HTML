@@ -1315,3 +1315,130 @@ body {
     }
 }
 
+/* ============================================
+   CARTE TOP COMMUNES
+   ============================================ */
+.map-section {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.map-header {
+    margin-bottom: var(--spacing-md);
+}
+
+.map-header h3 {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+    text-transform: uppercase;
+}
+
+.map-header p {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.map-container {
+    width: 100%;
+    height: clamp(400px, 50vh, 600px);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-bg-primary);
+}
+
+/* Override Leaflet pour thème sombre */
+.leaflet-container {
+    background: var(--color-bg-primary);
+    font-family: 'Inter', sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+.leaflet-popup-content {
+    margin: var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+.leaflet-popup-tip {
+    background: var(--color-bg-secondary);
+}
+
+.leaflet-control {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+.leaflet-control a {
+    color: var(--color-text-primary);
+    background: var(--color-bg-secondary);
+}
+
+.leaflet-control a:hover {
+    background: var(--color-bg-tertiary);
+}
+
+.leaflet-bar a.leaflet-disabled {
+    color: var(--color-text-dim);
+}
+
+/* Légende de la carte */
+.map-legend {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    background: rgba(30, 41, 59, 0.95);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    font-family: 'Inter', sans-serif;
+}
+
+.map-legend-title {
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+}
+
+.map-legend-item {
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+}
+
+.map-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: var(--spacing-sm);
+}
+
+.map-legend-label {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.pie-chart-marker {
+    background: transparent;
+    border: none;
+}
+
+.commune-label {
+    background: transparent;
+    border: none;
+    pointer-events: none;
+}
+
