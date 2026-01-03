@@ -419,20 +419,47 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
         freshContainer.innerHTML = allOptions.join('');
     }
     
-    // Gérer les clics sur les options avec délégation d'événements (un seul listener)
-    freshContainer.addEventListener('click', (e) => {
-        const option = e.target.closest('.dropdown-option[data-value]');
+    // Gérer les clics et changements avec délégation d'événements
+    const handleChange = (e) => {
+        const target = e.target;
+        let option, checkbox, value;
+        
+        // Si c'est un clic sur le conteneur, trouver l'option
+        if (target.classList.contains('dropdown-option')) {
+            option = target;
+        } else {
+            option = target.closest('.dropdown-option[data-value]');
+        }
+        
         if (!option) return;
         
         e.stopPropagation();
-        const checkbox = option.querySelector('input[type="checkbox"]');
-        const value = option.dataset.value;
+        checkbox = option.querySelector('input[type="checkbox"]');
+        value = option.dataset.value;
         
-        if (!value || !checkbox) return; // Ignorer les options sans valeur ou checkbox
+        if (!value || !checkbox) return;
+        
+        // Si c'est un clic sur le label ou la checkbox, laisser le comportement par défaut changer l'état
+        // puis synchroniser avec notre état
+        const isChecked = checkbox.checked;
         
         // Gérer l'option "Tout"
         if (value === '__ALL__') {
-            if (checkbox.checked) {
+            if (isChecked) {
+                // Sélectionner "Tout" = désélectionner toutes les options
+                state.filters[filterKey] = [];
+                // Mettre à jour toutes les checkboxes
+                freshContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
+                    if (opt.dataset.value !== '__ALL__') {
+                        const optCheckbox = opt.querySelector('input[type="checkbox"]');
+                        if (optCheckbox) {
+                            optCheckbox.checked = false;
+                            opt.classList.remove('selected');
+                        }
+                    }
+                });
+                option.classList.add('selected');
+            } else {
                 // Désélectionner "Tout" = sélectionner toutes les options
                 state.filters[filterKey] = [...options];
                 // Mettre à jour toutes les checkboxes
@@ -445,29 +472,18 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
                         }
                     }
                 });
-            } else {
-                // Sélectionner "Tout" = désélectionner toutes les options
-                state.filters[filterKey] = [];
-                // Mettre à jour toutes les checkboxes
-                freshContainer.querySelectorAll('.dropdown-option[data-value]').forEach(opt => {
-                    const optCheckbox = opt.querySelector('input[type="checkbox"]');
-                    if (optCheckbox) {
-                        optCheckbox.checked = false;
-                        opt.classList.remove('selected');
-                    }
-                });
-                checkbox.checked = true; // "Tout" reste coché
+                option.classList.remove('selected');
             }
         } else {
             // Gestion normale d'une option
-            checkbox.checked = !checkbox.checked;
-            
-            if (checkbox.checked) {
+            if (isChecked) {
+                // Ajouter à la sélection
                 if (!state.filters[filterKey].includes(value)) {
                     state.filters[filterKey].push(value);
                 }
                 option.classList.add('selected');
             } else {
+                // Retirer de la sélection
                 state.filters[filterKey] = state.filters[filterKey].filter(v => v !== value);
                 option.classList.remove('selected');
             }
@@ -477,8 +493,9 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
             if (allOption) {
                 const allCheckbox = allOption.querySelector('input[type="checkbox"]');
                 if (allCheckbox) {
-                    allCheckbox.checked = state.filters[filterKey].length === 0;
-                    if (state.filters[filterKey].length === 0) {
+                    const shouldBeAllSelected = state.filters[filterKey].length === 0;
+                    allCheckbox.checked = shouldBeAllSelected;
+                    if (shouldBeAllSelected) {
                         allOption.classList.add('selected');
                     } else {
                         allOption.classList.remove('selected');
@@ -500,6 +517,14 @@ function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
         window.filterTimeout = setTimeout(() => {
             applyFilters();
         }, 300);
+    };
+    
+    // Écouter les clics sur le conteneur
+    freshContainer.addEventListener('click', handleChange);
+    
+    // Écouter les changements sur les checkboxes (pour capturer les changements programmatiques)
+    freshContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', handleChange);
     });
     
     // Mettre à jour le texte du toggle
