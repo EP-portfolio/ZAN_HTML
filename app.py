@@ -127,7 +127,15 @@ def calculate_metrics(df):
     metrics["population"] = int(df["pop21"].sum())
     metrics["evolution_pop"] = int(df["pop1521"].sum())
     
-    # Efficience
+    # Efficience : m² d'artificialisation par nouveau habitant (2015-2021)
+    # = (Artificialisation totale 2009-2024 en m²) / (Évolution population 2015-2021)
+    # 
+    # INTERPRÉTATION :
+    # - Plus ce chiffre est BAS, mieux c'est (moins d'artificialisation par habitant gagné)
+    # - Indique la densité du développement : artificialisation intensive vs extensive
+    # - Un chiffre élevé = beaucoup d'artificialisation pour peu de nouveaux habitants (peu efficace)
+    # - Un chiffre bas = peu d'artificialisation pour beaucoup de nouveaux habitants (efficace)
+    # - Seuil de référence : < 200 m²/hab = conforme, 200-500 = vigilance, > 500 = critique
     if metrics["evolution_pop"] > 0:
         metrics["conso_par_hab"] = (metrics["artif_total_ha"] * 10000) / metrics["evolution_pop"]
     else:
@@ -255,7 +263,9 @@ def get_typologie_data(df):
     for col in ["naf09art24", "art09hab24", "art09act24", "art09mix24", "art09rou24"]:
         agg[col] = agg[col] / 10000
     
-    # Efficience
+    # Efficience : m² d'artificialisation par nouveau habitant (2015-2021)
+    # = (Artificialisation totale 2009-2024 en m²) / (Évolution population 2015-2021)
+    # Plus bas = mieux (moins d'artificialisation par habitant gagné)
     agg["efficience"] = np.where(
         agg["pop1521"] > 0,
         agg["naf09art24"] * 10000 / agg["pop1521"],
@@ -416,7 +426,10 @@ def get_densification_data(df):
 
 
 def get_benchmark_data():
-    """Données pour le radar benchmark SCOT vs CCPDA"""
+    """
+    Données pour le radar benchmark SCOT vs CCPDA
+    Chaque périmètre est normalisé par rapport à son propre maximum disponible
+    """
     if DF_SCOT is None or DF_CC is None:
         return None
     
@@ -427,27 +440,44 @@ def get_benchmark_data():
     def normalize(val, max_val):
         return min(100, (val / max_val) * 100) if max_val > 0 else 0
     
-    # Critères
-    max_artif = max(metrics_scot["artif_total_ha"], metrics_cc["artif_total_ha"])
+    # Pour chaque périmètre, normaliser par rapport à son propre maximum disponible
+    # 1. Artificialisation : % de l'enveloppe ZAN consommée (base 100 = enveloppe ZAN totale)
+    # 2. Population : comparée entre les deux (normalisée par le max entre les deux)
+    # 3. Efficience : inversée (moins = mieux), normalisée par le max entre les deux
+    # 4. Taux ZAN : inversé (0% consommé = 100, 100% consommé = 0)
+    # 5. Reste disponible : % de l'enveloppe ZAN restante (base 100 = enveloppe ZAN totale)
+    
+    # Maximums pour comparaison entre périmètres
     max_pop = max(metrics_scot["population"], metrics_cc["population"])
     max_eff = max(metrics_scot["conso_par_hab"], metrics_cc["conso_par_hab"])
-    max_taux = max(metrics_scot["taux_enveloppe"], metrics_cc["taux_enveloppe"])
     
     categories = ["Artificialisation", "Population", "Efficience", "Taux ZAN", "Reste disponible"]
     
+    # SCOT : normalisé par ses propres maximums disponibles
     scot_values = [
-        normalize(metrics_scot["artif_total_ha"], max_artif),
-        normalize(metrics_scot["population"], max_pop),
-        100 - normalize(metrics_scot["conso_par_hab"], max_eff),  # Inversé (moins = mieux)
-        100 - normalize(metrics_scot["taux_enveloppe"], 100),  # Inversé
+        # Artificialisation : % de l'enveloppe ZAN consommée (base 100 = enveloppe ZAN SCOT)
+        normalize(metrics_scot["artif_total_ha"], metrics_scot["enveloppe_zan"]) if metrics_scot["enveloppe_zan"] > 0 else 0,
+        # Population : normalisée par le max entre les deux pour comparaison
+        normalize(metrics_scot["population"], max_pop) if max_pop > 0 else 0,
+        # Efficience : inversée (moins de m²/hab = mieux), normalisée par le max entre les deux
+        100 - normalize(metrics_scot["conso_par_hab"], max_eff) if max_eff > 0 else 0,
+        # Taux ZAN : inversé (0% consommé = 100, 100% consommé = 0)
+        100 - min(100, metrics_scot["taux_enveloppe"]),
+        # Reste disponible : % de l'enveloppe ZAN restante (base 100 = enveloppe ZAN SCOT)
         normalize(metrics_scot["reste_disponible"], metrics_scot["enveloppe_zan"]) if metrics_scot["enveloppe_zan"] > 0 else 0,
     ]
     
+    # CCPDA : normalisé par ses propres maximums disponibles
     cc_values = [
-        normalize(metrics_cc["artif_total_ha"], max_artif),
-        normalize(metrics_cc["population"], max_pop),
-        100 - normalize(metrics_cc["conso_par_hab"], max_eff),
-        100 - normalize(metrics_cc["taux_enveloppe"], 100),
+        # Artificialisation : % de l'enveloppe ZAN consommée (base 100 = enveloppe ZAN CCPDA)
+        normalize(metrics_cc["artif_total_ha"], metrics_cc["enveloppe_zan"]) if metrics_cc["enveloppe_zan"] > 0 else 0,
+        # Population : normalisée par le max entre les deux pour comparaison
+        normalize(metrics_cc["population"], max_pop) if max_pop > 0 else 0,
+        # Efficience : inversée
+        100 - normalize(metrics_cc["conso_par_hab"], max_eff) if max_eff > 0 else 0,
+        # Taux ZAN : inversé
+        100 - min(100, metrics_cc["taux_enveloppe"]),
+        # Reste disponible : % de l'enveloppe ZAN restante (base 100 = enveloppe ZAN CCPDA)
         normalize(metrics_cc["reste_disponible"], metrics_cc["enveloppe_zan"]) if metrics_cc["enveloppe_zan"] > 0 else 0,
     ]
     
