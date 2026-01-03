@@ -60,6 +60,11 @@ function initEventListeners() {
                 state.perimetre = newPerimetre;
                 state.cache = {};
                 state.filters = { departements: [], communes: [], typologies: [] };
+                
+                // Fermer tous les menus déroulants
+                document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+                document.querySelectorAll('.dropdown-toggle.active').forEach(t => t.classList.remove('active'));
+                
                 updateMobilePerimetre();
                 loadFilterOptions();
                 loadAllData();
@@ -68,10 +73,10 @@ function initEventListeners() {
         });
     });
     
-    // Filtres
-    document.getElementById('filterDepartements')?.addEventListener('change', handleFilterChange);
-    document.getElementById('filterCommunes')?.addEventListener('change', handleFilterChange);
-    document.getElementById('filterTypologies')?.addEventListener('change', handleFilterChange);
+    // Filtres - Menus déroulants personnalisés
+    initDropdown('dropdownDepartements', 'menuDepartements', 'optionsDepartements', 'searchDepartements', 'departements');
+    initDropdown('dropdownCommunes', 'menuCommunes', 'optionsCommunes', 'searchCommunes', 'communes');
+    initDropdown('dropdownTypologies', 'menuTypologies', 'optionsTypologies', 'searchTypologies', 'typologies');
     
     // Onglets - méthode plus robuste
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -286,7 +291,11 @@ async function fetchAPI(endpoint) {
 
 async function loadFilterOptions() {
     try {
-        const response = await fetch(`/api/filter-options?perimetre=${state.perimetre}`);
+        const params = new URLSearchParams();
+        params.append('perimetre', state.perimetre);
+        state.filters.departements.forEach(d => params.append('departements', d));
+        
+        const response = await fetch(`/api/filter-options?${params.toString()}`);
         if (response.ok) {
             const options = await response.json();
             state.filterOptions = options;
@@ -297,69 +306,171 @@ async function loadFilterOptions() {
     }
 }
 
+// ============================================
+// MENUS DÉROULANTS PERSONNALISÉS
+// ============================================
+
+function initDropdown(toggleId, menuId, optionsId, searchId, filterKey) {
+    const toggle = document.getElementById(toggleId);
+    const menu = document.getElementById(menuId);
+    const optionsContainer = document.getElementById(optionsId);
+    const searchInput = document.getElementById(searchId);
+    
+    if (!toggle || !menu || !optionsContainer) return;
+    
+    // Toggle menu
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = menu.classList.contains('show');
+        
+        // Fermer tous les autres menus
+        document.querySelectorAll('.dropdown-menu.show').forEach(m => {
+            if (m !== menu) m.classList.remove('show');
+        });
+        document.querySelectorAll('.dropdown-toggle.active').forEach(t => {
+            if (t !== toggle) t.classList.remove('active');
+        });
+        
+        // Toggle ce menu
+        if (isOpen) {
+            menu.classList.remove('show');
+            toggle.classList.remove('active');
+        } else {
+            menu.classList.add('show');
+            toggle.classList.add('active');
+        }
+    });
+    
+    // Recherche
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const options = optionsContainer.querySelectorAll('.dropdown-option');
+            options.forEach(opt => {
+                const text = opt.textContent.toLowerCase();
+                opt.style.display = text.includes(query) ? 'flex' : 'none';
+            });
+        });
+    }
+    
+    // Fermer au clic extérieur
+    document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target) && !toggle.contains(e.target)) {
+            menu.classList.remove('show');
+            toggle.classList.remove('active');
+        }
+    });
+}
+
 function updateFilterSelects() {
-    // Départements
-    const deptSelect = document.getElementById('filterDepartements');
-    if (deptSelect) {
-        deptSelect.innerHTML = '<option value="">Tous les départements</option>' +
-            state.filterOptions.departements.map(d => `<option value="${d}">${d}</option>`).join('');
+    updateDropdown('optionsDepartements', 'dropdownDepartements', state.filterOptions.departements, 'departements', 'Tous les départements');
+    updateDropdown('optionsCommunes', 'dropdownCommunes', state.filterOptions.communes, 'communes', 'Toutes les communes');
+    updateDropdown('optionsTypologies', 'dropdownTypologies', state.filterOptions.typologies, 'typologies', 'Toutes les typologies');
+}
+
+function updateDropdown(optionsId, toggleId, options, filterKey, defaultText) {
+    const optionsContainer = document.getElementById(optionsId);
+    const toggle = document.getElementById(toggleId);
+    
+    if (!optionsContainer || !toggle) return;
+    
+    // Filtrer les valeurs sélectionnées qui ne sont plus disponibles
+    state.filters[filterKey] = state.filters[filterKey].filter(v => options.includes(v));
+    
+    // Créer les options
+    if (options.length === 0) {
+        optionsContainer.innerHTML = '<div class="dropdown-option" style="color: var(--color-text-muted); cursor: default;">Aucune option disponible</div>';
+    } else {
+        optionsContainer.innerHTML = options.map(opt => {
+            const isSelected = state.filters[filterKey].includes(opt);
+            const safeId = opt.replace(/[^a-zA-Z0-9]/g, '_');
+            return `
+                <div class="dropdown-option ${isSelected ? 'selected' : ''}" data-value="${opt}">
+                    <input type="checkbox" id="check_${filterKey}_${safeId}" ${isSelected ? 'checked' : ''}>
+                    <label for="check_${filterKey}_${safeId}">${opt}</label>
+                </div>
+            `;
+        }).join('');
     }
     
-    // Communes
-    const commSelect = document.getElementById('filterCommunes');
-    if (commSelect) {
-        commSelect.innerHTML = '<option value="">Toutes les communes</option>' +
-            state.filterOptions.communes.map(c => `<option value="${c}">${c}</option>`).join('');
-    }
+    // Gérer les clics sur les options
+    optionsContainer.querySelectorAll('.dropdown-option[data-value]').forEach(option => {
+        option.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            const value = option.dataset.value;
+            
+            if (!value) return; // Ignorer les options sans valeur
+            
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                if (!state.filters[filterKey].includes(value)) {
+                    state.filters[filterKey].push(value);
+                }
+                option.classList.add('selected');
+            } else {
+                state.filters[filterKey] = state.filters[filterKey].filter(v => v !== value);
+                option.classList.remove('selected');
+            }
+            
+            // Mettre à jour le texte du toggle
+            updateToggleText(toggleId, filterKey, defaultText);
+            
+            // Si changement de départements, recharger les communes
+            if (filterKey === 'departements') {
+                reloadCommunesOptions();
+            }
+            
+            // Appliquer les filtres
+            applyFilters();
+        });
+    });
     
-    // Typologies
-    const typoSelect = document.getElementById('filterTypologies');
-    if (typoSelect) {
-        typoSelect.innerHTML = '<option value="">Toutes les typologies</option>' +
-            state.filterOptions.typologies.map(t => `<option value="${t}">${t}</option>`).join('');
+    // Mettre à jour le texte du toggle
+    updateToggleText(toggleId, filterKey, defaultText);
+}
+
+function updateToggleText(toggleId, filterKey, defaultText) {
+    const toggle = document.getElementById(toggleId);
+    if (!toggle) return;
+    
+    const selected = state.filters[filterKey];
+    const textSpan = toggle.querySelector('.dropdown-text');
+    
+    if (selected.length === 0) {
+        textSpan.textContent = defaultText;
+    } else if (selected.length === 1) {
+        textSpan.textContent = selected[0];
+    } else {
+        textSpan.textContent = `${selected.length} sélectionné${selected.length > 1 ? 's' : ''}`;
     }
 }
 
-async function handleFilterChange(event) {
-    const deptSelect = document.getElementById('filterDepartements');
-    const commSelect = document.getElementById('filterCommunes');
-    const typoSelect = document.getElementById('filterTypologies');
+async function reloadCommunesOptions() {
+    const params = new URLSearchParams();
+    params.append('perimetre', state.perimetre);
+    state.filters.departements.forEach(d => params.append('departements', d));
     
-    // Si changement de départements, recharger les communes disponibles
-    if (event?.target?.id === 'filterDepartements') {
-        const selectedDepts = Array.from(deptSelect?.selectedOptions || [])
-            .map(opt => opt.value).filter(v => v);
-        
-        // Recharger les communes filtrées
-        const params = new URLSearchParams();
-        params.append('perimetre', state.perimetre);
-        selectedDepts.forEach(d => params.append('departements', d));
-        
-        try {
-            const response = await fetch(`/api/filter-options?${params.toString()}`);
-            if (response.ok) {
-                const options = await response.json();
-                // Mettre à jour seulement les communes
-                commSelect.innerHTML = '<option value="">Toutes les communes</option>' +
-                    options.communes.map(c => `<option value="${c}">${c}</option>`).join('');
-                // Réinitialiser la sélection de communes
-                state.filters.communes = [];
-            }
-        } catch (error) {
-            console.error('Erreur rechargement communes:', error);
+    try {
+        const response = await fetch(`/api/filter-options?${params.toString()}`);
+        if (response.ok) {
+            const options = await response.json();
+            state.filterOptions.communes = options.communes;
+            
+            // Réinitialiser la sélection de communes si elles ne sont plus disponibles
+            state.filters.communes = state.filters.communes.filter(c => 
+                options.communes.includes(c)
+            );
+            
+            updateDropdown('optionsCommunes', 'dropdownCommunes', options.communes, 'communes', 'Toutes les communes');
         }
+    } catch (error) {
+        console.error('Erreur rechargement communes:', error);
     }
-    
-    // Récupérer les valeurs sélectionnées
-    state.filters.departements = Array.from(deptSelect?.selectedOptions || [])
-        .map(opt => opt.value).filter(v => v);
-    
-    state.filters.communes = Array.from(commSelect?.selectedOptions || [])
-        .map(opt => opt.value).filter(v => v);
-    
-    state.filters.typologies = Array.from(typoSelect?.selectedOptions || [])
-        .map(opt => opt.value).filter(v => v);
-    
+}
+
+function applyFilters() {
     // Invalider le cache
     state.cache = {};
     

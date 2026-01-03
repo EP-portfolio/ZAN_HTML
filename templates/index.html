@@ -44,25 +44,52 @@
                 
                 <div class="filter-section">
                     <label class="filter-label">Département</label>
-                    <select id="filterDepartements" class="filter-select" multiple>
-                        <option value="">Chargement...</option>
-                    </select>
+                    <div class="dropdown-container">
+                        <button class="dropdown-toggle" id="dropdownDepartements" type="button">
+                            <span class="dropdown-text">Tous les départements</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-menu" id="menuDepartements">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="Rechercher..." class="dropdown-search-input" id="searchDepartements">
+                            </div>
+                            <div class="dropdown-options" id="optionsDepartements"></div>
+                        </div>
+                    </div>
                     <div class="filter-hint">Sélection multiple possible</div>
                 </div>
                 
                 <div class="filter-section">
                     <label class="filter-label">Communes</label>
-                    <select id="filterCommunes" class="filter-select" multiple>
-                        <option value="">Chargement...</option>
-                    </select>
+                    <div class="dropdown-container">
+                        <button class="dropdown-toggle" id="dropdownCommunes" type="button">
+                            <span class="dropdown-text">Toutes les communes</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-menu" id="menuCommunes">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="Rechercher..." class="dropdown-search-input" id="searchCommunes">
+                            </div>
+                            <div class="dropdown-options" id="optionsCommunes"></div>
+                        </div>
+                    </div>
                     <div class="filter-hint">Sélection multiple possible</div>
                 </div>
                 
                 <div class="filter-section">
                     <label class="filter-label">Typologie Urbaine</label>
-                    <select id="filterTypologies" class="filter-select" multiple>
-                        <option value="">Chargement...</option>
-                    </select>
+                    <div class="dropdown-container">
+                        <button class="dropdown-toggle" id="dropdownTypologies" type="button">
+                            <span class="dropdown-text">Toutes les typologies</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-menu" id="menuTypologies">
+                            <div class="dropdown-search">
+                                <input type="text" placeholder="Rechercher..." class="dropdown-search-input" id="searchTypologies">
+                            </div>
+                            <div class="dropdown-options" id="optionsTypologies"></div>
+                        </div>
+                    </div>
                     <div class="filter-hint">Sélection multiple possible</div>
                 </div>
                 
