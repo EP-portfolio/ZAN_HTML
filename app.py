@@ -128,7 +128,9 @@ def calculate_metrics(df):
     metrics["evolution_pop"] = int(df["pop1521"].sum())
     
     # Efficience : m² d'artificialisation par nouveau habitant (2015-2021)
-    # = (Artificialisation totale 2009-2024 en m²) / (Évolution population 2015-2021)
+    # = (Artificialisation 2015-2021 en m²) / (Évolution population 2015-2021)
+    # 
+    # IMPORTANT : Les périodes doivent être cohérentes (même période pour numérateur et dénominateur)
     # 
     # INTERPRÉTATION :
     # - Plus ce chiffre est BAS, mieux c'est (moins d'artificialisation par habitant gagné)
@@ -136,8 +138,13 @@ def calculate_metrics(df):
     # - Un chiffre élevé = beaucoup d'artificialisation pour peu de nouveaux habitants (peu efficace)
     # - Un chiffre bas = peu d'artificialisation pour beaucoup de nouveaux habitants (efficace)
     # - Seuil de référence : < 200 m²/hab = conforme, 200-500 = vigilance, > 500 = critique
+    
+    # Calculer l'artificialisation sur la période 2015-2021 (cohérent avec pop1521)
+    cols_artif_1521 = ["naf15art16", "naf16art17", "naf17art18", "naf18art19", "naf19art20", "naf20art21"]
+    artif_1521 = sum(df[col].sum() for col in cols_artif_1521 if col in df.columns)
+    
     if metrics["evolution_pop"] > 0:
-        metrics["conso_par_hab"] = (metrics["artif_total_ha"] * 10000) / metrics["evolution_pop"]
+        metrics["conso_par_hab"] = artif_1521 / metrics["evolution_pop"]
     else:
         metrics["conso_par_hab"] = 0
     
@@ -250,12 +257,20 @@ def get_typologie_data(df):
     df_copy = df.copy()
     df_copy["typo_label"] = df_copy["aav2020_typo"].astype(str).map(typo_labels).fillna("Autre")
     
+    # Calculer l'artificialisation 2015-2021 pour chaque ligne (cohérent avec pop1521)
+    cols_artif_1521 = ["naf15art16", "naf16art17", "naf17art18", "naf18art19", "naf19art20", "naf20art21"]
+    df_copy["artif_1521"] = 0
+    for col in cols_artif_1521:
+        if col in df_copy.columns:
+            df_copy["artif_1521"] += df_copy[col]
+    
     agg = df_copy.groupby("typo_label").agg({
-        "naf09art24": "sum",
+        "naf09art24": "sum",  # Pour l'affichage total (2009-2024)
         "art09hab24": "sum",
         "art09act24": "sum",
         "art09mix24": "sum",
         "art09rou24": "sum",
+        "artif_1521": "sum",  # Artificialisation 2015-2021 pour l'efficience
         "pop1521": "sum",
     }).reset_index()
     
@@ -264,11 +279,12 @@ def get_typologie_data(df):
         agg[col] = agg[col] / 10000
     
     # Efficience : m² d'artificialisation par nouveau habitant (2015-2021)
-    # = (Artificialisation totale 2009-2024 en m²) / (Évolution population 2015-2021)
+    # = (Artificialisation 2015-2021 en m²) / (Évolution population 2015-2021)
+    # IMPORTANT : Périodes cohérentes (même période pour numérateur et dénominateur)
     # Plus bas = mieux (moins d'artificialisation par habitant gagné)
     agg["efficience"] = np.where(
         agg["pop1521"] > 0,
-        agg["naf09art24"] * 10000 / agg["pop1521"],
+        agg["artif_1521"] / agg["pop1521"],
         0
     )
     
