@@ -522,15 +522,32 @@ function createSVGPieChart(values, colors, size) {
  * Carte Top 10 communes avec pie charts
  */
 async function renderTop10Map(containerId, data) {
+    // Vérifier que Leaflet est chargé
+    if (typeof L === 'undefined') {
+        console.error('Leaflet n\'est pas chargé');
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.innerHTML = '<p style="color: var(--color-red); padding: 2rem; text-align: center;">Erreur : bibliothèque de carte non chargée</p>';
+        }
+        return;
+    }
+    
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) {
+        console.error('Conteneur carte non trouvé:', containerId);
+        return;
+    }
     
     // Nettoyer la carte précédente
-    container.innerHTML = '';
+    container.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--color-text-muted);">Chargement de la carte...</div>';
     
     // Détruire la carte Leaflet existante si elle existe
     if (window.top10Map) {
-        window.top10Map.remove();
+        try {
+            window.top10Map.remove();
+        } catch (e) {
+            console.warn('Erreur lors de la suppression de la carte précédente:', e);
+        }
         window.top10Map = null;
     }
     
@@ -557,18 +574,35 @@ async function renderTop10Map(containerId, data) {
             return;
         }
         
+        // Vérifier que le conteneur a une taille avant d'initialiser
+        if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+            console.warn('Conteneur carte sans taille, attente...');
+            setTimeout(() => renderTop10Map(containerId, data), 500);
+            return;
+        }
+        
         // Calculer le centre approximatif
-        const lats = coordsData.map(c => c.lat);
-        const lons = coordsData.map(c => c.lon);
+        const lats = coordsData.map(c => c.lat).filter(lat => !isNaN(lat) && lat !== null);
+        const lons = coordsData.map(c => c.lon).filter(lon => !isNaN(lon) && lon !== null);
+        
+        if (lats.length === 0 || lons.length === 0) {
+            container.innerHTML = '<p style="color: var(--color-red); padding: 2rem; text-align: center;">Erreur : coordonnées invalides</p>';
+            return;
+        }
+        
         const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
         const centerLon = lons.reduce((a, b) => a + b, 0) / lons.length;
+        
+        // Nettoyer le conteneur avant d'initialiser la carte
+        container.innerHTML = '';
         
         // Créer la carte avec fond sombre
         const map = L.map(containerId, {
             center: [centerLat, centerLon],
-            zoom: 8,
+            zoom: 9,
             zoomControl: true,
-            preferCanvas: true // Meilleure performance pour beaucoup de marqueurs
+            preferCanvas: true,
+            attributionControl: true
         });
         
         // Stocker la référence pour pouvoir la détruire plus tard
@@ -578,7 +612,8 @@ async function renderTop10Map(containerId, data) {
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
             subdomains: 'abcd',
-            maxZoom: 19
+            maxZoom: 19,
+            minZoom: 6
         }).addTo(map);
         
         // Couleurs des destinations
@@ -660,17 +695,19 @@ async function renderTop10Map(containerId, data) {
             markersGroup.addLayer(marker);
             
             // Ajouter un label avec le nom de la commune (positionné en dessous)
-            // Utiliser un offset en pixels plutôt qu'en coordonnées
-            const labelOffsetPx = size / 2 + 10; // Offset en pixels
+            // Calculer un offset en degrés approximatif (1 degré ≈ 111 km)
+            // Pour un offset de ~50 pixels à zoom 10, c'est environ 0.001 degré
+            const labelOffsetDeg = 0.0015; // Offset en degrés (légèrement en dessous)
             const labelIcon = L.divIcon({
-                html: `<div style="font-size: 11px; font-weight: bold; color: ${COLORS.textPrimary}; text-align: center; background: rgba(30, 41, 59, 0.95); padding: 3px 8px; border-radius: 4px; white-space: nowrap; border: 1px solid ${COLORS.border}; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${communeData.commune}</div>`,
+                html: `<div style="font-size: 11px; font-weight: bold; color: ${COLORS.textPrimary}; text-align: center; background: rgba(30, 41, 59, 0.95); padding: 3px 8px; border-radius: 4px; white-space: nowrap; border: 1px solid ${COLORS.border}; box-shadow: 0 2px 4px rgba(0,0,0,0.3); pointer-events: none;">${communeData.commune}</div>`,
                 className: 'commune-label',
                 iconSize: [150, 25],
-                iconAnchor: [75, -labelOffsetPx] // Anchor en haut pour positionner en dessous
+                iconAnchor: [75, 12] // Anchor au centre-bas
             });
             
-            // Le label est à la même position mais avec un anchor différent
-            const labelMarker = L.marker([coord.lat, coord.lon], { 
+            // Positionner le label légèrement en dessous du marqueur
+            const labelLat = coord.lat - labelOffsetDeg;
+            const labelMarker = L.marker([labelLat, coord.lon], { 
                 icon: labelIcon, 
                 zIndexOffset: -500,
                 interactive: false
@@ -681,24 +718,47 @@ async function renderTop10Map(containerId, data) {
         
         // Ajouter tous les marqueurs à la carte et ajuster la vue
         map.whenReady(() => {
-            // Attendre un peu pour s'assurer que le conteneur est complètement rendu
+            // S'assurer que la carte est bien initialisée
+            map.invalidateSize();
+            
+            // Attendre que les tuiles soient chargées
             setTimeout(() => {
+                // Ajouter les marqueurs
                 markersGroup.addTo(map);
                 
                 // Calculer les bounds pour centrer automatiquement sur tous les marqueurs
-                const bounds = coordsData.map(c => [c.lat, c.lon]);
-                if (bounds.length > 0) {
-                    // Utiliser fitBounds avec un léger délai pour s'assurer que tout est rendu
+                const validBounds = coordsData
+                    .filter(c => !isNaN(c.lat) && !isNaN(c.lon) && c.lat !== null && c.lon !== null)
+                    .map(c => [c.lat, c.lon]);
+                
+                if (validBounds.length > 0) {
+                    // Créer un groupe de bounds Leaflet
+                    const bounds = L.latLngBounds(validBounds);
+                    
+                    // Utiliser fitBounds avec un délai pour s'assurer que tout est rendu
                     setTimeout(() => {
-                        map.fitBounds(bounds, {
-                            padding: [80, 80], // Padding en pixels (plus d'espace)
-                            maxZoom: 11 // Zoom maximum pour éviter d'être trop proche
-                        });
-                        // Forcer l'invalidation de la taille pour s'assurer que tout est bien affiché
-                        map.invalidateSize();
-                    }, 200);
+                        try {
+                            map.fitBounds(bounds, {
+                                padding: [60, 60], // Padding en pixels
+                                maxZoom: 12, // Zoom maximum
+                                animate: true
+                            });
+                            // Forcer l'invalidation après fitBounds
+                            setTimeout(() => {
+                                map.invalidateSize();
+                            }, 300);
+                        } catch (e) {
+                            console.error('Erreur lors du fitBounds:', e);
+                            // Fallback : centrer sur le premier point
+                            if (validBounds.length > 0) {
+                                map.setView(validBounds[0], 10);
+                            }
+                        }
+                    }, 300);
+                } else {
+                    console.warn('Aucune coordonnée valide pour fitBounds');
                 }
-            }, 100);
+            }, 200);
         });
         
         // Ajouter la légende
@@ -720,7 +780,12 @@ async function renderTop10Map(containerId, data) {
         
     } catch (error) {
         console.error('Erreur création carte:', error);
-        container.innerHTML = '<p style="color: var(--color-red); padding: 2rem; text-align: center;">Erreur lors du chargement de la carte</p>';
+        container.innerHTML = `
+            <div style="padding: 2rem; text-align: center;">
+                <p style="color: var(--color-red); margin-bottom: 1rem; font-weight: bold;">Erreur lors du chargement de la carte</p>
+                <p style="color: var(--color-text-muted); font-size: 0.9rem;">${error.message || 'Erreur inconnue'}</p>
+            </div>
+        `;
     }
 }
 
