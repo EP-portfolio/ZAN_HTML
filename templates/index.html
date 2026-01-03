@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard de suivi de l'artificialisation des sols - Objectif ZAN 2031">
+    <title>Dashboard ZAN - Artificialisation des Sols</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">Dashboard ZAN</h1>
+                <p class="sidebar-subtitle">Artificialisation des Sols</p>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="filter-section">
+                    <label class="filter-label">Périmètre d'étude</label>
+                    <div class="radio-group">
+                        <label class="radio-item">
+                            <input type="radio" name="perimetre" value="scot" checked>
+                            <span class="radio-custom"></span>
+                            <span class="radio-text">SCoT Rives du Rhône</span>
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="perimetre" value="ccpda">
+                            <span class="radio-custom"></span>
+                            <span class="radio-text">CC Porte DrômArdèche</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="sidebar-info">
+                    <div class="info-item">
+                        <span class="info-label">Source</span>
+                        <span class="info-value">Observatoire de l'artificialisation</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Période</span>
+                        <span class="info-value">2009-2024</span>
+                    </div>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="https://artificialisation.developpement-durable.gouv.fr" target="_blank" class="sidebar-link">
+                    Portail national ZAN
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Mobile Header -->
+        <header class="mobile-header">
+            <button class="menu-toggle" id="menuToggle" aria-label="Menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <h1 class="mobile-title">Dashboard ZAN</h1>
+            <div class="mobile-perimetre" id="mobilePerimetre">SCOT</div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header Section -->
+            <header class="content-header">
+                <div class="header-info">
+                    <h1 class="page-title">Indicateurs Clés</h1>
+                    <p class="page-subtitle" id="perimetreLabel">SCoT des Rives du Rhône</p>
+                </div>
+                <div class="header-meta">
+                    <span class="meta-item" id="nbCommunes">-- communes</span>
+                    <span class="meta-separator">|</span>
+                    <span class="meta-item">Données 2009-2024</span>
+                </div>
+            </header>
+            
+            <!-- KPIs Section -->
+            <section class="kpi-section">
+                <div class="kpi-grid">
+                    <div class="kpi-card" data-color="blue">
+                        <div class="kpi-label">Artificialisation Totale</div>
+                        <div class="kpi-value"><span id="kpiArtifTotal">--</span> <span class="kpi-unit">ha</span></div>
+                        <div class="kpi-sublabel">Consommation 2009-2024</div>
+                    </div>
+                    <div class="kpi-card" data-color="green">
+                        <div class="kpi-label">Population 2021</div>
+                        <div class="kpi-value"><span id="kpiPopulation">--</span></div>
+                        <div class="kpi-sublabel">Évolution: <span id="kpiEvolutionPop">--</span></div>
+                    </div>
+                    <div class="kpi-card" data-color="purple">
+                        <div class="kpi-label">Consommation par habitant</div>
+                        <div class="kpi-value"><span id="kpiConsoHab">--</span> <span class="kpi-unit">m²</span></div>
+                        <div class="kpi-sublabel">Par habitant ajouté</div>
+                    </div>
+                </div>
+                
+                <div class="kpi-grid kpi-grid-2">
+                    <div class="kpi-card" data-color="orange">
+                        <div class="kpi-label">Enveloppe ZAN 2031</div>
+                        <div class="kpi-value"><span id="kpiEnveloppe">--</span> <span class="kpi-unit">ha</span></div>
+                        <div class="kpi-sublabel">Reste: <span id="kpiReste">--</span> ha</div>
+                    </div>
+                    <div class="kpi-card" id="kpiStatutCard" data-color="green">
+                        <div class="kpi-label">Statut Trajectoire</div>
+                        <div class="kpi-value"><span id="kpiStatut">--</span></div>
+                        <div class="kpi-sublabel"><span id="kpiTaux">--</span>% de l'enveloppe</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <!-- Tabs Navigation -->
+                <div class="tabs-nav">
+                    <button class="tab-btn active" data-tab="evolution">Évolution Annuelle</button>
+                    <button class="tab-btn" data-tab="repartition">Répartition</button>
+                    <button class="tab-btn" data-tab="top10">Top Communes</button>
+                    <button class="tab-btn" data-tab="typologie">Typologie</button>
+                </div>
+                
+                <!-- Tab Contents -->
+                <div class="tabs-content">
+                    <!-- Evolution Tab -->
+                    <div class="tab-panel active" id="tab-evolution">
+                        <div class="chart-header">
+                            <h2 class="chart-title">Évolution de la consommation d'espaces NAF</h2>
+                            <p class="chart-subtitle">Consommation annuelle en hectares (2009-2024)</p>
+                        </div>
+                        <div class="chart-container" id="chartEvolution"></div>
+                    </div>
+                    
+                    <!-- Repartition Tab -->
+                    <div class="tab-panel" id="tab-repartition">
+                        <div class="chart-header">
+                            <h2 class="chart-title">Répartition par destination</h2>
+                            <p class="chart-subtitle">Distribution selon l'usage des espaces artificialisés</p>
+                        </div>
+                        <div class="chart-wrapper">
+                            <div class="chart-container chart-donut" id="chartRepartition"></div>
+                            <div class="chart-legend" id="legendRepartition"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Top 10 Tab -->
+                    <div class="tab-panel" id="tab-top10">
+                        <div class="chart-header">
+                            <h2 class="chart-title">Top 10 Communes</h2>
+                            <p class="chart-subtitle">Communes les plus artificialisées par destination (2009-2024)</p>
+                        </div>
+                        <div class="chart-container chart-horizontal" id="chartTop10"></div>
+                    </div>
+                    
+                    <!-- Typologie Tab -->
+                    <div class="tab-panel" id="tab-typologie">
+                        <div class="chart-header">
+                            <h2 class="chart-title">Analyse par Typologie Territoriale</h2>
+                            <p class="chart-subtitle">Répartition selon la classification INSEE AAV 2020</p>
+                        </div>
+                        <div class="chart-container" id="chartTypologie"></div>
+                        <div class="typologie-cards" id="typologieCards"></div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Footer -->
+            <footer class="content-footer">
+                <p class="footer-text">
+                    Source : Observatoire de l'artificialisation des sols | Données : 2009-2024
+                </p>
+            </footer>
+        </main>
+    </div>
+    
+    <!-- Overlay for mobile menu -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+
