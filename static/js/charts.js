@@ -557,7 +557,7 @@ async function renderTop10Map(containerId, data) {
             return;
         }
         
-        // Calculer le centre
+        // Calculer le centre approximatif
         const lats = coordsData.map(c => c.lat);
         const lons = coordsData.map(c => c.lon);
         const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
@@ -566,8 +566,9 @@ async function renderTop10Map(containerId, data) {
         // Créer la carte avec fond sombre
         const map = L.map(containerId, {
             center: [centerLat, centerLon],
-            zoom: 9,
-            zoomControl: true
+            zoom: 8,
+            zoomControl: true,
+            preferCanvas: true // Meilleure performance pour beaucoup de marqueurs
         });
         
         // Stocker la référence pour pouvoir la détruire plus tard
@@ -595,13 +596,16 @@ async function renderTop10Map(containerId, data) {
         // Trouver le max pour la taille des marqueurs
         const maxArtif = Math.max(...data.map(d => d.total));
         
+        // Créer un groupe de marqueurs pour meilleure gestion
+        const markersGroup = L.layerGroup();
+        
         // Ajouter les marqueurs avec pie charts
         coordsData.forEach(coord => {
             const communeData = dataMap[coord.code];
             if (!communeData) return;
             
-            // Taille proportionnelle (entre 30 et 70 pixels)
-            const size = Math.max(30, Math.min(70, 30 + (communeData.total / maxArtif) * 40));
+            // Taille proportionnelle (entre 25 et 50 pixels pour éviter chevauchements)
+            const size = Math.max(25, Math.min(50, 25 + (communeData.total / maxArtif) * 25));
             
             // Valeurs des destinations
             const values = [
@@ -646,20 +650,55 @@ async function renderTop10Map(containerId, data) {
             
             // Ajouter le marqueur
             const marker = L.marker([coord.lat, coord.lon], { icon: icon })
-                .addTo(map)
                 .bindPopup(popupHtml)
-                .bindTooltip(`${communeData.commune}: ${communeData.total.toFixed(1)} ha`);
+                .bindTooltip(`${communeData.commune}: ${communeData.total.toFixed(1)} ha`, {
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -size/2 - 5]
+                });
             
-            // Ajouter un label avec le nom de la commune
+            markersGroup.addLayer(marker);
+            
+            // Ajouter un label avec le nom de la commune (positionné en dessous)
+            // Utiliser un offset en pixels plutôt qu'en coordonnées
+            const labelOffsetPx = size / 2 + 10; // Offset en pixels
             const labelIcon = L.divIcon({
-                html: `<div style="font-size: 10px; font-weight: bold; color: ${COLORS.textPrimary}; text-align: center; background: rgba(30, 41, 59, 0.9); padding: 2px 6px; border-radius: 3px; white-space: nowrap;">${communeData.commune}</div>`,
+                html: `<div style="font-size: 11px; font-weight: bold; color: ${COLORS.textPrimary}; text-align: center; background: rgba(30, 41, 59, 0.95); padding: 3px 8px; border-radius: 4px; white-space: nowrap; border: 1px solid ${COLORS.border}; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${communeData.commune}</div>`,
                 className: 'commune-label',
-                iconSize: [120, 20],
-                iconAnchor: [60, 0]
+                iconSize: [150, 25],
+                iconAnchor: [75, -labelOffsetPx] // Anchor en haut pour positionner en dessous
             });
             
-            L.marker([coord.lat, coord.lon], { icon: labelIcon, zIndexOffset: -1000 })
-                .addTo(map);
+            // Le label est à la même position mais avec un anchor différent
+            const labelMarker = L.marker([coord.lat, coord.lon], { 
+                icon: labelIcon, 
+                zIndexOffset: -500,
+                interactive: false
+            });
+            
+            markersGroup.addLayer(labelMarker);
+        });
+        
+        // Ajouter tous les marqueurs à la carte et ajuster la vue
+        map.whenReady(() => {
+            // Attendre un peu pour s'assurer que le conteneur est complètement rendu
+            setTimeout(() => {
+                markersGroup.addTo(map);
+                
+                // Calculer les bounds pour centrer automatiquement sur tous les marqueurs
+                const bounds = coordsData.map(c => [c.lat, c.lon]);
+                if (bounds.length > 0) {
+                    // Utiliser fitBounds avec un léger délai pour s'assurer que tout est rendu
+                    setTimeout(() => {
+                        map.fitBounds(bounds, {
+                            padding: [80, 80], // Padding en pixels (plus d'espace)
+                            maxZoom: 11 // Zoom maximum pour éviter d'être trop proche
+                        });
+                        // Forcer l'invalidation de la taille pour s'assurer que tout est bien affiché
+                        map.invalidateSize();
+                    }, 200);
+                }
+            }, 100);
         });
         
         // Ajouter la légende
