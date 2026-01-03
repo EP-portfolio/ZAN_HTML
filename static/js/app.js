@@ -11,7 +11,17 @@ const state = {
     cache: {},
     communesData: [],
     sortColumn: 'total_ha',
-    sortAsc: false
+    sortAsc: false,
+    filters: {
+        departements: [],
+        communes: [],
+        typologies: []
+    },
+    filterOptions: {
+        departements: [],
+        communes: [],
+        typologies: []
+    }
 };
 
 const elements = {
@@ -32,6 +42,8 @@ const elements = {
 
 document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
+    loadLastUpdate();
+    loadFilterOptions();
     loadAllData();
 });
 
@@ -46,14 +58,20 @@ function initEventListeners() {
             const newPerimetre = e.target.value;
             if (state.perimetre !== newPerimetre) {
                 state.perimetre = newPerimetre;
-                state.cache = {}; // Invalider complètement le cache
+                state.cache = {};
+                state.filters = { departements: [], communes: [], typologies: [] };
                 updateMobilePerimetre();
-                // Recharger toutes les données
+                loadFilterOptions();
                 loadAllData();
                 closeSidebar();
             }
         });
     });
+    
+    // Filtres
+    document.getElementById('filterDepartements')?.addEventListener('change', handleFilterChange);
+    document.getElementById('filterCommunes')?.addEventListener('change', handleFilterChange);
+    document.getElementById('filterTypologies')?.addEventListener('change', handleFilterChange);
     
     // Onglets - méthode plus robuste
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -241,15 +259,129 @@ async function loadAllData() {
 }
 
 async function fetchAPI(endpoint) {
-    const cacheKey = `${endpoint}?perimetre=${state.perimetre}`;
+    // Construire l'URL avec filtres
+    const params = new URLSearchParams();
+    params.append('perimetre', state.perimetre);
+    
+    if (state.filters.departements.length > 0) {
+        state.filters.departements.forEach(d => params.append('departements', d));
+    }
+    if (state.filters.communes.length > 0) {
+        state.filters.communes.forEach(c => params.append('communes', c));
+    }
+    if (state.filters.typologies.length > 0) {
+        state.filters.typologies.forEach(t => params.append('typologies', t));
+    }
+    
+    const cacheKey = `${endpoint}?${params.toString()}`;
     if (state.cache[cacheKey]) return state.cache[cacheKey];
     
-    const response = await fetch(`/api/${endpoint}?perimetre=${state.perimetre}`);
+    const response = await fetch(`/api/${endpoint}?${params.toString()}`);
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     
     const data = await response.json();
     state.cache[cacheKey] = data;
     return data;
+}
+
+async function loadFilterOptions() {
+    try {
+        const response = await fetch(`/api/filter-options?perimetre=${state.perimetre}`);
+        if (response.ok) {
+            const options = await response.json();
+            state.filterOptions = options;
+            updateFilterSelects();
+        }
+    } catch (error) {
+        console.error('Erreur chargement options filtres:', error);
+    }
+}
+
+function updateFilterSelects() {
+    // Départements
+    const deptSelect = document.getElementById('filterDepartements');
+    if (deptSelect) {
+        deptSelect.innerHTML = '<option value="">Tous les départements</option>' +
+            state.filterOptions.departements.map(d => `<option value="${d}">${d}</option>`).join('');
+    }
+    
+    // Communes
+    const commSelect = document.getElementById('filterCommunes');
+    if (commSelect) {
+        commSelect.innerHTML = '<option value="">Toutes les communes</option>' +
+            state.filterOptions.communes.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+    
+    // Typologies
+    const typoSelect = document.getElementById('filterTypologies');
+    if (typoSelect) {
+        typoSelect.innerHTML = '<option value="">Toutes les typologies</option>' +
+            state.filterOptions.typologies.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+}
+
+async function handleFilterChange(event) {
+    const deptSelect = document.getElementById('filterDepartements');
+    const commSelect = document.getElementById('filterCommunes');
+    const typoSelect = document.getElementById('filterTypologies');
+    
+    // Si changement de départements, recharger les communes disponibles
+    if (event?.target?.id === 'filterDepartements') {
+        const selectedDepts = Array.from(deptSelect?.selectedOptions || [])
+            .map(opt => opt.value).filter(v => v);
+        
+        // Recharger les communes filtrées
+        const params = new URLSearchParams();
+        params.append('perimetre', state.perimetre);
+        selectedDepts.forEach(d => params.append('departements', d));
+        
+        try {
+            const response = await fetch(`/api/filter-options?${params.toString()}`);
+            if (response.ok) {
+                const options = await response.json();
+                // Mettre à jour seulement les communes
+                commSelect.innerHTML = '<option value="">Toutes les communes</option>' +
+                    options.communes.map(c => `<option value="${c}">${c}</option>`).join('');
+                // Réinitialiser la sélection de communes
+                state.filters.communes = [];
+            }
+        } catch (error) {
+            console.error('Erreur rechargement communes:', error);
+        }
+    }
+    
+    // Récupérer les valeurs sélectionnées
+    state.filters.departements = Array.from(deptSelect?.selectedOptions || [])
+        .map(opt => opt.value).filter(v => v);
+    
+    state.filters.communes = Array.from(commSelect?.selectedOptions || [])
+        .map(opt => opt.value).filter(v => v);
+    
+    state.filters.typologies = Array.from(typoSelect?.selectedOptions || [])
+        .map(opt => opt.value).filter(v => v);
+    
+    // Invalider le cache
+    state.cache = {};
+    
+    // Recharger les données
+    loadAllData();
+}
+
+async function loadLastUpdate() {
+    try {
+        const response = await fetch('/api/last-update');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('lastUpdate').textContent = data.last_update;
+        }
+    } catch (error) {
+        console.error('Erreur chargement date:', error);
+    }
+    
+    // Date de consultation
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR');
+    document.getElementById('consultDate').textContent = dateStr;
 }
 
 // ============================================
@@ -260,7 +392,7 @@ async function loadMetrics() {
     const data = await fetchAPI('metrics');
     
     elements.perimetreLabel.textContent = data.perimetre;
-    elements.nbCommunes.textContent = `${data.nb_communes} communes`;
+    elements.nbCommunes.textContent = `${data.nb_communes_filtrees || data.nb_communes} communes`;
     
     updateKPI('kpiArtifTotal', formatNumber(data.artif_total_ha, 0));
     updateKPI('kpiPopulation', formatNumber(data.population, 0));
@@ -276,6 +408,13 @@ async function loadMetrics() {
     document.getElementById('infoConso2124').textContent = `${data.conso_2021_2024.toFixed(1)} ha`;
     document.getElementById('infoReste').textContent = `${data.reste_disponible.toFixed(1)} ha`;
     
+    // Résumé de sélection
+    if (data.nb_communes_filtrees !== undefined) {
+        document.getElementById('summaryNbCommunes').textContent = data.nb_communes_filtrees;
+        document.getElementById('summaryPop').textContent = formatNumber(data.pop_filtree, 0);
+        document.getElementById('summaryArtif').textContent = `${data.artif_filtree.toFixed(1)} ha`;
+    }
+    
     // Statut et jauge
     const taux = data.taux_enveloppe;
     let statut, color, statusText;
@@ -285,7 +424,7 @@ async function loadMetrics() {
     } else if (taux < 50) {
         statut = 'VIGILANCE'; color = 'orange'; statusText = 'Vigilance recommandée';
     } else {
-        statut = 'ALERTE'; color = 'red'; statusText = 'Risque de dépassement';
+        statut = 'ALERTE'; color = 'red'; statusText = 'Attention : risque de dépassement';
     }
     
     updateKPI('kpiStatut', statut);

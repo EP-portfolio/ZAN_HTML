@@ -42,6 +42,46 @@
                     </div>
                 </div>
                 
+                <div class="filter-section">
+                    <label class="filter-label">Département</label>
+                    <select id="filterDepartements" class="filter-select" multiple>
+                        <option value="">Chargement...</option>
+                    </select>
+                    <div class="filter-hint">Sélection multiple possible</div>
+                </div>
+                
+                <div class="filter-section">
+                    <label class="filter-label">Communes</label>
+                    <select id="filterCommunes" class="filter-select" multiple>
+                        <option value="">Chargement...</option>
+                    </select>
+                    <div class="filter-hint">Sélection multiple possible</div>
+                </div>
+                
+                <div class="filter-section">
+                    <label class="filter-label">Typologie Urbaine</label>
+                    <select id="filterTypologies" class="filter-select" multiple>
+                        <option value="">Chargement...</option>
+                    </select>
+                    <div class="filter-hint">Sélection multiple possible</div>
+                </div>
+                
+                <div class="filter-summary" id="filterSummary">
+                    <div class="summary-title">SÉLECTION ACTUELLE</div>
+                    <div class="summary-item">
+                        <span class="summary-label">Communes</span>
+                        <span class="summary-value" id="summaryNbCommunes">--</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Habitants</span>
+                        <span class="summary-value" id="summaryPop">--</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Artificialisé</span>
+                        <span class="summary-value" id="summaryArtif">-- ha</span>
+                    </div>
+                </div>
+                
                 <div class="sidebar-info">
                     <div class="info-item">
                         <span class="info-label">Source</span>
@@ -72,7 +112,28 @@
         
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Header -->
+            <!-- Header Principal -->
+            <header class="main-header">
+                <div class="header-left">
+                    <div class="header-border"></div>
+                    <div class="header-content">
+                        <h1 class="main-title">DASHBOARD DE PILOTAGE ZAN</h1>
+                        <p class="main-subtitle">Suivi de l'artificialisation des sols - Objectif Zéro Artificialisation Nette</p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-meta-card">
+                        <div class="meta-label">Dernière mise à jour</div>
+                        <div class="meta-value" id="lastUpdate">--</div>
+                    </div>
+                    <div class="header-meta-card">
+                        <div class="meta-label">Date de consultation</div>
+                        <div class="meta-value" id="consultDate">--</div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Section Header -->
             <header class="content-header">
                 <div class="header-info">
                     <h1 class="page-title">Indicateurs Clés</h1>

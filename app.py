@@ -68,6 +68,44 @@ except Exception as e:
 
 
 # ============================================
+# FONCTIONS HELPER - FILTRES
+# ============================================
+
+def apply_filters(df, departements=None, communes=None, typologies=None):
+    """Applique les filtres au DataFrame"""
+    df_filtered = df.copy()
+    
+    if departements:
+        df_filtered = df_filtered[df_filtered["iddeptxt"].isin(departements)]
+    
+    if communes:
+        df_filtered = df_filtered[df_filtered["idcomtxt"].isin(communes)]
+    
+    if typologies:
+        # Convertir les labels en codes
+        typo_codes = {
+            "Pôle principal": "11",
+            "Couronne grande aire": "12",
+            "Petite/moyenne aire": "20",
+            "Hors attraction": "30"
+        }
+        codes = [typo_codes.get(t, t) for t in typologies]
+        df_filtered = df_filtered[df_filtered["aav2020_typo"].astype(str).isin(codes)]
+    
+    return df_filtered
+
+
+def get_filtered_data(perimetre, departements=None, communes=None, typologies=None):
+    """Retourne le DataFrame filtré selon les critères"""
+    df = DF_SCOT if perimetre == "scot" else DF_CC
+    
+    if df is None:
+        return None
+    
+    return apply_filters(df, departements, communes, typologies)
+
+
+# ============================================
 # FONCTIONS DE CALCUL
 # ============================================
 
@@ -456,28 +494,80 @@ def index():
     return render_template("index.html", data_loaded=DATA_LOADED)
 
 
-@app.route("/api/metrics")
-def api_metrics():
-    """API: Métriques principales"""
+@app.route("/api/filter-options")
+def api_filter_options():
+    """API: Options disponibles pour les filtres"""
     perimetre = request.args.get("perimetre", "scot")
+    departements = request.args.getlist("departements")
+    
     df = DF_SCOT if perimetre == "scot" else DF_CC
     
     if df is None:
+        return jsonify({"departements": [], "communes": [], "typologies": []})
+    
+    # Départements
+    departements_list = sorted(df["iddeptxt"].unique().tolist())
+    
+    # Communes (filtrées par départements si sélectionnés)
+    df_communes = df.copy()
+    if departements:
+        df_communes = df_communes[df_communes["iddeptxt"].isin(departements)]
+    communes_list = sorted(df_communes["idcomtxt"].unique().tolist())
+    
+    # Typologies
+    typo_labels = {
+        "11": "Pôle principal",
+        "12": "Couronne grande aire",
+        "20": "Petite/moyenne aire",
+        "30": "Hors attraction"
+    }
+    typologies_list = []
+    for code, label in typo_labels.items():
+        if code in df["aav2020_typo"].astype(str).values:
+            typologies_list.append(label)
+    
+    return jsonify({
+        "departements": departements_list,
+        "communes": communes_list,
+        "typologies": typologies_list
+    })
+
+
+@app.route("/api/metrics")
+def api_metrics():
+    """API: Métriques principales avec filtres"""
+    perimetre = request.args.get("perimetre", "scot")
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
+    
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     metrics = calculate_metrics(df)
     metrics["perimetre"] = "SCoT des Rives du Rhône" if perimetre == "scot" else "CC Porte de DrômArdèche"
+    
+    # Ajouter résumé de sélection
+    metrics["nb_communes_filtrees"] = len(df)
+    metrics["pop_filtree"] = int(df["pop21"].sum())
+    metrics["artif_filtree"] = round(df["artif_total_ha"].sum(), 1)
     
     return jsonify(metrics)
 
 
 @app.route("/api/evolution")
 def api_evolution():
-    """API: Données d'évolution annuelle"""
+    """API: Données d'évolution annuelle avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_evolution_data(df))
@@ -485,11 +575,15 @@ def api_evolution():
 
 @app.route("/api/repartition")
 def api_repartition():
-    """API: Répartition par destination"""
+    """API: Répartition par destination avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_repartition_data(df))
@@ -497,12 +591,16 @@ def api_repartition():
 
 @app.route("/api/top-communes")
 def api_top_communes():
-    """API: Top communes"""
+    """API: Top communes avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
     n = int(request.args.get("n", 10))
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_top_communes(df, n))
@@ -510,11 +608,15 @@ def api_top_communes():
 
 @app.route("/api/typologie")
 def api_typologie():
-    """API: Données par typologie"""
+    """API: Données par typologie avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_typologie_data(df))
@@ -522,11 +624,15 @@ def api_typologie():
 
 @app.route("/api/trajectory")
 def api_trajectory():
-    """API: Trajectoire ZAN"""
+    """API: Trajectoire ZAN avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_trajectory_data(df))
@@ -534,12 +640,16 @@ def api_trajectory():
 
 @app.route("/api/risques")
 def api_risques():
-    """API: Risques communaux"""
+    """API: Risques communaux avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
     n = int(request.args.get("n", 15))
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_risques_communes(df, n))
@@ -547,11 +657,15 @@ def api_risques():
 
 @app.route("/api/densification")
 def api_densification():
-    """API: Évolution densification"""
+    """API: Évolution densification avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_densification_data(df))
@@ -570,14 +684,29 @@ def api_benchmark():
 
 @app.route("/api/communes")
 def api_communes():
-    """API: Tableau des communes"""
+    """API: Tableau des communes avec filtres"""
     perimetre = request.args.get("perimetre", "scot")
-    df = DF_SCOT if perimetre == "scot" else DF_CC
+    departements = request.args.getlist("departements")
+    communes = request.args.getlist("communes")
+    typologies = request.args.getlist("typologies")
     
-    if df is None:
+    df = get_filtered_data(perimetre, departements, communes, typologies)
+    
+    if df is None or len(df) == 0:
         return jsonify({"error": "Données non disponibles"}), 500
     
     return jsonify(get_communes_table(df))
+
+
+@app.route("/api/last-update")
+def api_last_update():
+    """API: Date de dernière mise à jour"""
+    try:
+        from utils.metadata import get_data_last_update
+        return jsonify({"last_update": get_data_last_update()})
+    except:
+        from datetime import datetime
+        return jsonify({"last_update": datetime.now().strftime("%d/%m/%Y")})
 
 
 # ============================================
