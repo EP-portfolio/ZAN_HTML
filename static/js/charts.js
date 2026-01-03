@@ -104,15 +104,16 @@ function renderTrajectoryChart(containerId, data) {
 }
 
 /**
- * Graphique d'évolution annuelle
+ * Graphique d'évolution annuelle - CORRIGÉ
  */
 function renderEvolutionChart(containerId, data) {
     const { periodes, consommations } = data;
     const moyenne = consommations.reduce((a, b) => a + b, 0) / consommations.length;
     
-    const colors = periodes.map(p => {
-        const year = parseInt(p.split('-')[0]);
-        return year >= 21 ? COLORS.purple : COLORS.blue;
+    // Couleurs selon période (années 2010-2021 = bleu, 2022-2024 = rose)
+    const colors = periodes.map(annee => {
+        const year = parseInt(annee);
+        return year <= 2021 ? COLORS.blue : COLORS.purple;
     });
     
     const traces = [
@@ -120,33 +121,55 @@ function renderEvolutionChart(containerId, data) {
             type: 'bar',
             x: periodes,
             y: consommations,
-            marker: { color: colors, line: { color: COLORS.bgSecondary, width: 1 } },
-            text: consommations.map(v => v.toFixed(1)),
+            marker: { 
+                color: colors, 
+                line: { color: COLORS.bgSecondary, width: 1 } 
+            },
+            text: consommations.map(v => `<b>${v.toFixed(1)}</b>`),
             textposition: 'outside',
-            textfont: { color: COLORS.textPrimary, size: 10 },
-            hovertemplate: '<b>%{x}</b><br>%{y:.1f} ha<extra></extra>'
+            textfont: { color: COLORS.textPrimary, size: 12 },
+            hovertemplate: '<b>Année %{x}</b><br>Consommation: %{y:.2f} ha<extra></extra>',
+            name: 'Consommation annuelle',
+            cliponaxis: false
         },
         {
             type: 'scatter',
             mode: 'lines',
             x: periodes,
             y: Array(periodes.length).fill(moyenne),
-            line: { color: COLORS.orange, width: 2, dash: 'dash' },
-            name: `Moyenne: ${moyenne.toFixed(1)} ha`,
+            line: { color: '#E74C3C', width: 2, dash: 'dash' },
+            name: `Moyenne: ${moyenne.toFixed(1)} ha/an`,
             hoverinfo: 'skip'
         }
     ];
     
     const layout = {
         ...getBaseLayout(),
-        showlegend: true,
-        legend: { x: 0.5, y: 1.1, xanchor: 'center', orientation: 'h', font: { size: 11, color: COLORS.textSecondary } },
-        xaxis: { ...getBaseLayout().xaxis, tickangle: -45 },
-        yaxis: { ...getBaseLayout().yaxis, title: { text: 'Hectares', font: { size: 12 } }, range: [0, Math.max(...consommations) * 1.3] },
+        title: {
+            text: 'ÉVOLUTION DE LA CONSOMMATION D\'ESPACES NAF',
+            font: { size: 16, color: COLORS.textPrimary },
+            x: 0.5
+        },
+        showlegend: false,
+        xaxis: { 
+            ...getBaseLayout().xaxis, 
+            title: { text: 'Année', font: { size: 12 } },
+            tickangle: 0,
+            showgrid: false
+        },
+        yaxis: { 
+            ...getBaseLayout().yaxis, 
+            title: { text: 'Hectares', font: { size: 12 } }, 
+            range: [0, Math.max(...consommations) * 1.35],
+            gridcolor: COLORS.border
+        },
+        margin: { t: 100, b: 60, l: 80, r: 40 },
         annotations: [{
             x: 0.02, y: 0.98, xref: 'paper', yref: 'paper',
-            text: '<b>Bleu</b>: Réf. 2010-2021 | <b>Rose</b>: ZAN 2022-2024',
-            showarrow: false, font: { size: 10, color: COLORS.textMuted }
+            text: '<b>Bleu</b>: Période référence (2010-2021) | <b>Rose</b>: Période ZAN (2022-2024)',
+            showarrow: false, 
+            font: { size: 11, color: COLORS.textSecondary },
+            align: 'left'
         }]
     };
     
@@ -337,21 +360,24 @@ function renderRisquesChart(containerId, data) {
 }
 
 /**
- * Graphique Densification
+ * Graphique Densification - CORRIGÉ pour correspondre à Streamlit
  */
 function renderDensificationChart(containerId, data) {
-    const colors = data.efficiences.map(e => e <= data.objectif ? COLORS.green : e <= 500 ? COLORS.orange : COLORS.red);
+    const colors = data.ratios.map(r => r <= data.objectif ? COLORS.blue : COLORS.purple);
     
     const traces = [
         {
             type: 'bar',
             x: data.periodes,
-            y: data.efficiences,
-            marker: { color: colors, line: { color: COLORS.bgSecondary, width: 1 } },
-            text: data.efficiences.map(v => `${v.toFixed(0)}`),
+            y: data.ratios,
+            marker: { 
+                color: colors, 
+                line: { color: COLORS.bgSecondary, width: 2 } 
+            },
+            text: data.ratios.map(v => `${v.toFixed(0)} m²/hab`),
             textposition: 'outside',
-            textfont: { size: 12, color: COLORS.textPrimary },
-            hovertemplate: '<b>%{x}</b><br>%{y:.0f} m²/hab<extra></extra>'
+            textfont: { size: 14, color: COLORS.textPrimary },
+            hovertemplate: '<b>%{x}</b><br>Ratio: %{y:.0f} m²/hab<extra></extra>'
         },
         {
             type: 'scatter',
@@ -359,17 +385,44 @@ function renderDensificationChart(containerId, data) {
             x: data.periodes,
             y: Array(data.periodes.length).fill(data.objectif),
             line: { color: COLORS.green, width: 2, dash: 'dash' },
-            name: `Objectif: ${data.objectif} m²/hab`
+            name: `Objectif efficient (${data.objectif})`,
+            hoverinfo: 'skip'
         }
     ];
     
+    const maxRatio = Math.max(...data.ratios, data.objectif);
+    
     const layout = {
         ...getBaseLayout(),
-        showlegend: true,
-        legend: { x: 0.5, y: 1.1, xanchor: 'center', orientation: 'h', font: { size: 11, color: COLORS.textSecondary } },
-        title: { text: 'Évolution de l\'efficience (m²/habitant ajouté)', font: { size: 14, color: COLORS.textPrimary }, x: 0.5 },
-        xaxis: { ...getBaseLayout().xaxis },
-        yaxis: { ...getBaseLayout().yaxis, title: { text: 'm²/habitant', font: { size: 11 } }, range: [0, Math.max(...data.efficiences) * 1.3] }
+        showlegend: false,
+        title: {
+            text: 'ÉVOLUTION DE LA DENSIFICATION',
+            font: { size: 16, color: COLORS.textPrimary },
+            x: 0.5
+        },
+        xaxis: { 
+            ...getBaseLayout().xaxis,
+            title: { text: 'Période', font: { size: 12 } }
+        },
+        yaxis: { 
+            ...getBaseLayout().yaxis, 
+            title: { text: 'm²/habitant ajouté', font: { size: 12 } }, 
+            range: [0, maxRatio * 1.3]
+        },
+        margin: { t: 80, b: 60, l: 80, r: 40 },
+        annotations: [
+            {
+                x: 0.98, y: data.objectif, xref: 'paper', yref: 'y',
+                text: `Objectif efficient (${data.objectif})`,
+                showarrow: true,
+                arrowhead: 2,
+                arrowcolor: COLORS.green,
+                font: { size: 10, color: COLORS.green },
+                bgcolor: 'rgba(15, 23, 42, 0.8)',
+                bordercolor: COLORS.green,
+                borderwidth: 1
+            }
+        ]
     };
     
     Plotly.newPlot(containerId, traces, layout, PLOTLY_CONFIG);

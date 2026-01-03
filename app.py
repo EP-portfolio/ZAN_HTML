@@ -121,22 +121,33 @@ def calculate_metrics(df):
 
 
 def get_evolution_data(df):
-    """Données pour le graphique d'évolution annuelle"""
+    """Données pour le graphique d'évolution annuelle - CORRIGÉ pour correspondre à Streamlit"""
+    # Utiliser les années 2010-2024 comme dans Streamlit
+    cols_annuelles = [
+        ("naf09art10", "2010"),
+        ("naf10art11", "2011"),
+        ("naf11art12", "2012"),
+        ("naf12art13", "2013"),
+        ("naf13art14", "2014"),
+        ("naf14art15", "2015"),
+        ("naf15art16", "2016"),
+        ("naf16art17", "2017"),
+        ("naf17art18", "2018"),
+        ("naf18art19", "2019"),
+        ("naf19art20", "2020"),
+        ("naf20art21", "2021"),
+        ("naf21art22", "2022"),
+        ("naf22art23", "2023"),
+        ("naf23art24", "2024"),
+    ]
+    
     periodes = []
     consommations = []
     
-    cols_evolution = [
-        ("naf09art10", "2009-10"), ("naf10art11", "2010-11"), ("naf11art12", "2011-12"),
-        ("naf12art13", "2012-13"), ("naf13art14", "2013-14"), ("naf14art15", "2014-15"),
-        ("naf15art16", "2015-16"), ("naf16art17", "2016-17"), ("naf17art18", "2017-18"),
-        ("naf18art19", "2018-19"), ("naf19art20", "2019-20"), ("naf20art21", "2020-21"),
-        ("naf21art22", "2021-22"), ("naf22art23", "2022-23"), ("naf23art24", "2023-24"),
-    ]
-    
-    for col, label in cols_evolution:
+    for col, annee in cols_annuelles:
         if col in df.columns:
             val = df[col].sum() / 10000
-            periodes.append(label)
+            periodes.append(annee)
             consommations.append(round(val, 2))
     
     return {"periodes": periodes, "consommations": consommations}
@@ -310,40 +321,54 @@ def get_risques_communes(df, n=15):
 
 
 def get_densification_data(df):
-    """Données pour l'évolution de la densification"""
-    # Périodes
-    periodes = ["2011-2015", "2015-2018", "2018-2021", "2021-2024"]
+    """Données pour l'évolution de la densification - CORRIGÉ pour correspondre à Streamlit"""
+    data_periodes = []
     
-    # Calcul par période
-    cols_periodes = [
-        (["naf11art12", "naf12art13", "naf13art14", "naf14art15"], ["pop15"]),
-        (["naf15art16", "naf16art17", "naf17art18"], ["pop15", "pop21"]),
-        (["naf18art19", "naf19art20", "naf20art21"], ["pop21"]),
-        (["naf21art22", "naf22art23", "naf23art24"], ["pop21"]),
-    ]
+    # Période 2015-2021 (Référence)
+    artif_1521 = 0
+    for col in ["naf15art16", "naf16art17", "naf17art18", "naf18art19", "naf19art20", "naf20art21"]:
+        if col in df.columns:
+            artif_1521 += df[col].sum()
     
-    efficiences = []
-    for artif_cols, pop_cols in cols_periodes:
-        artif = sum(df[col].sum() / 10000 for col in artif_cols if col in df.columns)
-        pop = df[pop_cols[-1]].sum() if pop_cols else 0
-        
-        # Estimation évolution pop par période
-        if len(pop_cols) == 2:
-            evol = df[pop_cols[1]].sum() - df[pop_cols[0]].sum()
-        else:
-            evol = df["pop1521"].sum() / 2  # Approximation
-        
-        if evol > 0:
-            eff = (artif * 10000) / evol
-        else:
-            eff = 0
-        
-        efficiences.append(round(eff, 0))
+    pop_1521 = df["pop1521"].sum()
+    
+    if pop_1521 > 0:
+        ratio_1521 = artif_1521 / pop_1521
+    else:
+        ratio_1521 = 0
+    
+    data_periodes.append({
+        "periode": "2015-2021 (Réf.)",
+        "ratio": round(ratio_1521, 0),
+        "artif_ha": round(artif_1521 / 10000, 2),
+        "pop_evol": int(pop_1521)
+    })
+    
+    # Période 2021-2024 (ZAN)
+    artif_2124 = 0
+    for col in ["naf21art22", "naf22art23", "naf23art24"]:
+        if col in df.columns:
+            artif_2124 += df[col].sum()
+    
+    # Estimation évolution pop 2021-2024 (proportionnelle à 2015-2021)
+    pop_2124_est = pop_1521 * (3 / 6)  # 3 ans vs 6 ans
+    
+    if pop_2124_est > 0:
+        ratio_2124 = artif_2124 / pop_2124_est
+    else:
+        ratio_2124 = artif_2124 / 1 if artif_2124 > 0 else 0
+    
+    data_periodes.append({
+        "periode": "2021-2024 (ZAN)",
+        "ratio": round(ratio_2124, 0),
+        "artif_ha": round(artif_2124 / 10000, 2),
+        "pop_evol": int(pop_2124_est)
+    })
     
     return {
-        "periodes": periodes,
-        "efficiences": efficiences,
-        "objectif": 200  # Seuil ZAN recommandé
+        "periodes": [d["periode"] for d in data_periodes],
+        "ratios": [d["ratio"] for d in data_periodes],
+        "objectif": 200
     }
 
 

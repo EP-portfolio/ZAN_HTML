@@ -43,11 +43,15 @@ function initEventListeners() {
     // Périmètre
     elements.perimetreRadios.forEach(radio => {
         radio.addEventListener('change', (e) => {
-            state.perimetre = e.target.value;
-            state.cache = {};
-            updateMobilePerimetre();
-            loadAllData();
-            closeSidebar();
+            const newPerimetre = e.target.value;
+            if (state.perimetre !== newPerimetre) {
+                state.perimetre = newPerimetre;
+                state.cache = {}; // Invalider complètement le cache
+                updateMobilePerimetre();
+                // Recharger toutes les données
+                loadAllData();
+                closeSidebar();
+            }
         });
     });
     
@@ -218,15 +222,17 @@ async function loadAllData() {
         await loadMetrics();
         await loadTrajectory();
         
-        // Charger les graphiques de la section active
+        // Charger TOUS les graphiques pour éviter les problèmes de cache
         await Promise.all([
-            loadEvolutionData(),  // Onglet actif par défaut
-            loadTypologieData(),  // Onglet actif par défaut section 2
+            loadEvolutionData(),
+            loadRepartitionData(),
+            loadTop10Data(),
+            loadTypologieData(),
+            loadRisquesData(),
+            loadDensificationData(),
             loadBenchmarkData(),
             loadCommunesData()
         ]);
-        
-        // Les autres graphiques seront chargés à la demande lors du clic sur les onglets
     } catch (error) {
         console.error('Erreur chargement:', error);
     } finally {
